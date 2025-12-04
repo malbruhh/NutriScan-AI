@@ -1,4 +1,3 @@
-fastapi
-uvicorn
-httpx
-pydantic
+flask
+flask-cors
+requests
