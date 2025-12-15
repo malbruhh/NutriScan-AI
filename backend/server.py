@@ -15,11 +15,12 @@ from typing import List, Dict, Any
 GOOGLE_API_KEY = "AIzaSyCollA6aPsr3Lj-WkTThwLHZc-ArgEPq8s"
 
 # Initialize the new Client
-# The new SDK uses a client instance rather than global configuration
 client = genai.Client(api_key=GOOGLE_API_KEY)
 
-# Using 'gemini-1.5-flash' (standard alias)
-MODEL_NAME = "gemini-2.0-flash-lite-preview-02-05"
+# UPDATED: Using 'gemini-2.5-flash'. 
+# This was at the top of your available list and is a STABLE version.
+# Stable versions usually have better regional availability for the Free Tier.
+MODEL_NAME = "gemini-2.5-flash"
 PORT = 8000
 
 # Initialize FastAPI App
@@ -64,21 +65,21 @@ class FoodRequest(BaseModel):
 # DEBUG TOOL: Check Available Models
 # ==========================================
 def print_available_models():
-    """Prints list of models available to this API key on startup using new SDK"""
+    """Prints list of models available to this API key on startup"""
     try:
         print("--- Checking Available Gemini Models ---")
-        found_flash = False
-        # New SDK method to list models
+        found_model = False
         for m in client.models.list():
-            # Filter for generation capable models
             if "generateContent" in m.supported_actions:
-                print(f"✅ Found: {m.name}")
-                if "flash" in m.name:
-                    found_flash = True
+                if m.name == f"models/{MODEL_NAME}" or m.name == MODEL_NAME:
+                    found_model = True
         print("----------------------------------------")
         
-        if not found_flash:
-            print("⚠️ WARNING: 'gemini-1.5-flash' not found in your list.")
+        if found_model:
+            print(f"✅ Successfully found model: {MODEL_NAME}")
+        else:
+            print(f"⚠️ WARNING: '{MODEL_NAME}' not found in your list.")
+            
     except Exception as e:
         print(f"⚠️ Could not list models (Check API Key): {e}")
 
@@ -116,8 +117,9 @@ def analyze_food(request: FoodRequest):
     except Exception as e:
         print(f"Gemini Error: {e}")
         error_msg = str(e)
-        if "404" in error_msg:
-            raise HTTPException(status_code=500, detail="Model not found. Check server console for available models.")
+        if "429" in error_msg:
+            # If you still get 429 here, it means your account has NO free tier at all.
+            raise HTTPException(status_code=429, detail="Your Google Cloud account has no free quota. Please enable billing at console.cloud.google.com to use the API (Pay-as-you-go).")
         raise HTTPException(status_code=500, detail=f"AI Error: {error_msg}")
 
 if __name__ == '__main__':
