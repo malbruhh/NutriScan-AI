@@ -362,6 +362,7 @@ window.toggleGraphModal = function() {
     }
 };
 
+//Fuzzy logic chart
 function initChart() {
     const ctx = document.getElementById('fuzzyChart').getContext('2d');
     const labels = Array.from({length: 101}, (_, i) => i);
