@@ -5,12 +5,13 @@ let targets = { cals: 2000, p: 150, c: 200, f: 65 };
 let current = { cals: 0, p: 0, c: 0, f: 0 };
 let history = [];
 let chartInstance = null;
-let lastScore = 50; // Default score for graph line
-let lastDeleted = null; // Stores the deleted item for Undo
+let lastScore = 50; 
+let lastDeleted = null;
+let currentImageBase64 = null; // Store the selected image string here
 
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
-    updateDashboard(); // Set initial zeros
+    updateDashboard(); 
     
     // Scan Button
     const scanBtn = document.getElementById('scanBtn');
@@ -28,7 +29,40 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // Image Input Listener
+    const imgInput = document.getElementById('imageInput');
+    if (imgInput) {
+        imgInput.addEventListener('change', handleImageSelect);
+    }
 });
+
+// --- Image Handling ---
+function handleImageSelect(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        currentImageBase64 = e.target.result; // Saves "data:image/jpeg;base64,..."
+        
+        // Show Preview in UI
+        const previewContainer = document.getElementById('imagePreviewContainer');
+        const previewImg = document.getElementById('previewImg');
+        previewImg.src = currentImageBase64;
+        previewContainer.classList.remove('hidden');
+        previewContainer.classList.add('flex');
+    };
+    reader.readAsDataURL(file);
+}
+
+window.clearImage = function() {
+    currentImageBase64 = null;
+    document.getElementById('imageInput').value = ""; 
+    const container = document.getElementById('imagePreviewContainer');
+    container.classList.add('hidden');
+    container.classList.remove('flex');
+};
 
 // --- Core API Analysis ---
 async function analyzeFood() {
@@ -36,7 +70,8 @@ async function analyzeFood() {
     const btn = document.getElementById('scanBtn');
     const status = document.getElementById('statusMsg');
 
-    if (!input.trim()) return;
+    // Allow analysis if text OR image is present
+    if (!input.trim() && !currentImageBase64) return;
 
     // UI Loading State
     btn.disabled = true;
@@ -44,10 +79,15 @@ async function analyzeFood() {
     status.classList.remove('hidden');
     
     try {
+        const payload = { 
+            text: input,
+            image: currentImageBase64 // Send image if exists
+        };
+
         const response = await fetch(API_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text: input }) 
+            body: JSON.stringify(payload) 
         });
 
         if (!response.ok) {
@@ -79,9 +119,13 @@ async function analyzeFood() {
         // Update UI
         renderHistory();
         updateDashboard();
-        updateChart(); // Refresh chart if modal is open
+        updateChart(); 
+        
+        // Reset Inputs
+        clearImage();
+        document.getElementById('userInput').value = ''; 
 
-        // Clear Undo state on new add (optional, but cleaner UX)
+        // Clear Undo
         lastDeleted = null;
         const undoBtn = document.getElementById('undoBtn');
         if(undoBtn) undoBtn.classList.add('hidden');
@@ -90,11 +134,9 @@ async function analyzeFood() {
         console.error(error);
         alert("Error: " + error.message);
     } finally {
-        // Reset UI
         btn.disabled = false;
         btn.innerHTML = `<i class="fa-solid fa-magnifying-glass"></i><span>Analyze</span>`;
         status.classList.add('hidden');
-        document.getElementById('userInput').value = ''; 
     }
 }
 
@@ -108,7 +150,6 @@ function renderHistory() {
     countEl.innerText = `${history.length} items`;
 
     history.forEach((item, index) => {
-        // Run Fuzzy Logic per item to get category color
         const fuzzy = calculateFuzzyHealth(item.calories, item.protein, item.fats, item.carbs);
         
         const li = document.createElement('li');
@@ -137,14 +178,10 @@ function renderHistory() {
     });
 }
 
-// Make globally accessible for HTML onclick buttons
 window.deleteItem = function(index) {
     const item = history[index];
-    
-    // 1. Save state for Undo
-    lastDeleted = { item: item, index: index };
+    lastDeleted = { item: item, index: index }; // Save for Undo
 
-    // 2. Remove values
     current.cals -= item.calories;
     current.p -= item.protein;
     current.c -= item.carbs;
@@ -152,7 +189,6 @@ window.deleteItem = function(index) {
     
     history.splice(index, 1);
     
-    // 3. Show Undo Button
     const undoBtn = document.getElementById('undoBtn');
     if (undoBtn) {
         undoBtn.classList.remove('hidden');
@@ -165,24 +201,19 @@ window.deleteItem = function(index) {
 
 window.undoDelete = function() {
     if (!lastDeleted) return;
-
     const { item, index } = lastDeleted;
 
-    // 1. Restore Values
     current.cals += item.calories;
     current.p += item.protein;
     current.c += item.carbs;
     current.f += item.fats;
 
-    // 2. Restore Item to original position
-    // Use splice to insert back exactly where it was
     if (index >= 0 && index <= history.length) {
         history.splice(index, 0, item);
     } else {
-        history.push(item); // Fallback
+        history.push(item);
     }
 
-    // 3. Clear state & Hide Button
     lastDeleted = null;
     document.getElementById('undoBtn').classList.add('hidden');
 
@@ -191,7 +222,6 @@ window.undoDelete = function() {
 };
 
 function updateDashboard() {
-    // Text Updates
     document.getElementById('displayCals').innerText = Math.round(current.cals);
     document.getElementById('targetCals').innerText = targets.cals;
     document.getElementById('displayP').innerText = Math.round(current.p);
@@ -201,16 +231,12 @@ function updateDashboard() {
     document.getElementById('displayF').innerText = Math.round(current.f);
     document.getElementById('targetF').innerText = targets.f;
 
-    // Helper for percentage width
     const calcPct = (val, target) => Math.min(100, Math.max(0, (val / target) * 100)) + '%';
     
-    // Macro Lines
     document.getElementById('lineP').style.width = calcPct(current.p, targets.p);
     document.getElementById('lineC').style.width = calcPct(current.c, targets.c);
     document.getElementById('lineF').style.width = calcPct(current.f, targets.f);
 
-    // Stacked Total Bar
-    // We normalize macros to calories (P=4, C=4, F=9) relative to total target
     const pCals = current.p * 4;
     const cCals = current.c * 4;
     const fCals = current.f * 9;
@@ -222,23 +248,19 @@ function updateDashboard() {
     document.getElementById('calPercent').innerText = Math.round((current.cals / targets.cals) * 100) + '%';
 }
 
-// --- Edit Mode Logic ---
-
+// --- Edit Mode & Targets ---
 window.toggleEditMode = function() {
     const view = document.getElementById('trackerView');
     const edit = document.getElementById('trackerEdit');
     
     if (edit.classList.contains('hidden')) {
-        // Open Edit
         document.getElementById('editTotal').value = targets.cals;
         document.getElementById('editP').value = targets.p;
         document.getElementById('editC').value = targets.c;
         document.getElementById('editF').value = targets.f;
-        
         view.classList.add('hidden');
         edit.classList.remove('hidden');
     } else {
-        // Close Edit
         edit.classList.add('hidden');
         view.classList.remove('hidden');
     }
@@ -249,7 +271,6 @@ window.saveProfile = function() {
     targets.p = parseInt(document.getElementById('editP').value) || 150;
     targets.c = parseInt(document.getElementById('editC').value) || 200;
     targets.f = parseInt(document.getElementById('editF').value) || 65;
-    
     window.toggleEditMode();
     updateDashboard();
 };
@@ -260,11 +281,8 @@ window.calculateBMR = function() {
     const a = parseFloat(document.getElementById('userAge').value);
     const g = document.getElementById('userGender').value;
     
-    // Mifflin-St Jeor
     let bmr = (10 * w) + (6.25 * h) - (5 * a);
     bmr += (g === 'male') ? 5 : -161;
-    
-    // TDEE (Moderate exercise assumption)
     const tdee = Math.round(bmr * 1.375);
     setTargetsFromCals(tdee);
 };
@@ -290,10 +308,7 @@ function setTargetsFromCals(cals, type='maintain') {
 }
 
 // --- Fuzzy Logic Engine ---
-
 function calculateFuzzyHealth(calories=0, protein=0, fats=0, carbs=0) {
-    
-    // 1. FUZZIFICATION (Membership Functions)
     const tri = (val, low, peak, high) => {
         if (val <= low || val >= high) return 0;
         if (val === peak) return 1;
@@ -304,29 +319,12 @@ function calculateFuzzyHealth(calories=0, protein=0, fats=0, carbs=0) {
     const trapHigh = (val, low, peak) => (val >= peak ? 1 : val <= low ? 0 : (val - low) / (peak - low));
 
     const f = {
-        calories: {
-            low: trapLow(calories, 150, 400),
-            med: tri(calories, 300, 500, 700),
-            high: trapHigh(calories, 600, 800)
-        },
-        protein: {
-            low: trapLow(protein, 5, 10),
-            med: tri(protein, 5, 15, 25),
-            high: trapHigh(protein, 20, 30)
-        },
-        fats: {
-            low: trapLow(fats, 5, 10),
-            med: tri(fats, 5, 15, 25),
-            high: trapHigh(fats, 20, 30)
-        },
-        carbs: {
-            low: trapLow(carbs, 20, 40),
-            med: tri(carbs, 30, 60, 90),
-            high: trapHigh(carbs, 80, 100)
-        }
+        calories: { low: trapLow(calories, 150, 400), med: tri(calories, 300, 500, 700), high: trapHigh(calories, 600, 800) },
+        protein: { low: trapLow(protein, 5, 10), med: tri(protein, 5, 15, 25), high: trapHigh(protein, 20, 30) },
+        fats: { low: trapLow(fats, 5, 10), med: tri(fats, 5, 15, 25), high: trapHigh(fats, 20, 30) },
+        carbs: { low: trapLow(carbs, 20, 40), med: tri(carbs, 30, 60, 90), high: trapHigh(carbs, 80, 100) }
     };
 
-    // 2. RULE EVALUATION
     let rs = { veryHealthy: 0, healthy: 0, notHealthy: 0, junk: 0 };
 
     rs.veryHealthy = Math.max(rs.veryHealthy, Math.min(f.protein.high, f.fats.low));
@@ -340,20 +338,17 @@ function calculateFuzzyHealth(calories=0, protein=0, fats=0, carbs=0) {
     rs.veryHealthy = Math.max(rs.veryHealthy, Math.min(f.calories.low, f.protein.med));
     rs.notHealthy = Math.max(rs.notHealthy, 0.1); 
 
-    // 3. DEFUZZIFICATION
     const num = (rs.veryHealthy * 90) + (rs.healthy * 65) + (rs.notHealthy * 35) + (rs.junk * 15);
     const den = rs.veryHealthy + rs.healthy + rs.notHealthy + rs.junk;
     const score = den === 0 ? 50 : num / den;
 
-    // 4. CATEGORIZATION
     if (score >= 80) return { score, category: "Very Healthy", colorName: "emerald", colorClass: "text-emerald-400" };
     if (score >= 60) return { score, category: "Healthy", colorName: "green", colorClass: "text-green-400" };
     if (score >= 35) return { score, category: "Not Healthy", colorName: "orange", colorClass: "text-orange-400" };
     return { score, category: "Junk Food", colorName: "red", colorClass: "text-red-500" };
 }
 
-// --- Graph Visuals (Chart.js) ---
-
+// --- Chart Visuals ---
 window.toggleGraphModal = function() {
     const modal = document.getElementById('graphModal');
     if (modal.classList.contains('hidden')) {
@@ -369,10 +364,7 @@ window.toggleGraphModal = function() {
 
 function initChart() {
     const ctx = document.getElementById('fuzzyChart').getContext('2d');
-    
     const labels = Array.from({length: 101}, (_, i) => i);
-    
-    // Trapezoidal Logic Visualization
     const junkData = labels.map(x => (x <= 15 ? 1 : x >= 35 ? 0 : (35 - x) / 20));
     const notHealthyData = labels.map(x => (x <= 15 || x >= 55 ? 0 : x <= 35 ? (x - 15) / 20 : (55 - x) / 20));
     const healthyData = labels.map(x => (x <= 35 || x >= 85 ? 0 : x <= 60 ? (x - 35) / 25 : (85 - x) / 25));
