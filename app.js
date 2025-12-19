@@ -4,13 +4,15 @@ const API_URL = "http://localhost:8000/analyze";
 let targets = { cals: 2000, p: 150, c: 200, f: 65 };
 let current = { cals: 0, p: 0, c: 0, f: 0 };
 let history = [];
-let chartInstance = null;
+let chartInstance = null; // Fuzzy Graph
+let donutChartInstance = null; // Calorie Donut
 let lastScore = 50; 
 let lastDeleted = null;
 let currentImageBase64 = null; 
 
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
+    initDonutChart(); // Initialize the donut UI
     updateDashboard(); 
     
     const scanBtn = document.getElementById('scanBtn');
@@ -55,7 +57,7 @@ window.clearImage = function() {
     container.classList.remove('flex');
 };
 
-// --- Analysis Logic ---
+// --- Core API Analysis ---
 async function analyzeFood() {
     const input = document.getElementById('userInput').value;
     const btn = document.getElementById('scanBtn');
@@ -180,21 +182,61 @@ window.undoDelete = function() {
     updateDashboard();
 };
 
+function initDonutChart() {
+    const ctx = document.getElementById('calorieDonut').getContext('2d');
+    donutChartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Protein', 'Carbs', 'Fat', 'Remaining'],
+            datasets: [{
+                data: [0, 0, 0, targets.cals],
+                backgroundColor: ['#EF4444', '#3B82F6', '#EAB308', '#E5E7EB'],
+                borderWidth: 0,
+                hoverOffset: 4,
+                cutout: '75%'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: { enabled: true }
+            }
+        }
+    });
+}
+
 function updateDashboard() {
-    document.getElementById('displayCals').innerText = Math.round(current.cals);
+    const consumed = Math.round(current.cals);
+    const pCals = Math.round(current.p * 4);
+    const cCals = Math.round(current.c * 4);
+    const fCals = Math.round(current.f * 9);
+    
+    // We calculate remaining by subtracting consumed from target
+    const remaining = Math.max(0, targets.cals - consumed);
+
+    // Update Text
+    document.getElementById('displayCals').innerText = consumed;
     document.getElementById('targetCals').innerText = targets.cals;
     document.getElementById('displayP').innerText = Math.round(current.p);
     document.getElementById('displayC').innerText = Math.round(current.c);
     document.getElementById('displayF').innerText = Math.round(current.f);
+    
+    // Update Donut Center Text: "xx/xx"
+    document.getElementById('calFraction').innerText = `${consumed}/${targets.cals}`;
 
+    // Update Donut Chart Data
+    if (donutChartInstance) {
+        donutChartInstance.data.datasets[0].data = [pCals, cCals, fCals, remaining];
+        donutChartInstance.update();
+    }
+
+    // Update Progress Bars (Right side)
     const calcPct = (val, target) => Math.min(100, Math.max(0, (val / target) * 100)) + '%';
-    const pCals = current.p * 4;
-    const cCals = current.c * 4;
-    const fCals = current.f * 9;
-    document.getElementById('barP').style.width = ((pCals / targets.cals) * 100) + '%';
-    document.getElementById('barC').style.width = ((cCals / targets.cals) * 100) + '%';
-    document.getElementById('barF').style.width = ((fCals / targets.cals) * 100) + '%';
-    document.getElementById('calPercent').innerText = Math.round((current.cals / targets.cals) * 100) + '%';
+    document.getElementById('barP').style.width = calcPct(current.p, targets.p);
+    document.getElementById('barC').style.width = calcPct(current.c, targets.c);
+    document.getElementById('barF').style.width = calcPct(current.f, targets.f);
 }
 
 // --- Fuzzy Logic Engine ---
@@ -294,7 +336,6 @@ function updateChart() {
     if (chartInstance) chartInstance.update();
 }
 
-// Placeholder for missing settings logic
 window.toggleEditMode = function() {
     const view = document.getElementById('trackerView');
     const edit = document.getElementById('trackerEdit');
