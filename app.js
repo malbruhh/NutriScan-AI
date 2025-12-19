@@ -145,7 +145,8 @@ async function analyzeFood() {
         alert("Error: " + error.message);
     } finally {
         btn.disabled = false;
-        btn.innerHTML = `Analyze`;
+        // Updated to restore the Analyze text with the sparkles icon
+        btn.innerHTML = `Analyze <i class="fa-solid fa-sparkles text-sm"></i>`;
         status?.classList.add('hidden');
     }
 }

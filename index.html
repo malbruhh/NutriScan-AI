@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NutriScan - 3-Column Tracker</title>
+    <title>NutriScan AI - Personalized Calorie Tracker</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -314,9 +314,17 @@
                 <div class="flex-grow flex flex-col relative">
                     <textarea id="userInput" class="w-full h-full p-5 pb-24 bg-transparent rounded-2xl border border-black/5 focus:outline-none focus:ring-1 focus:ring-purple-200 resize-none placeholder-gray-400" placeholder="Describe your food..."></textarea>
                     <div id="imagePreviewContainer" class="hidden absolute bottom-20 left-5 right-5 h-24 glass-panel bg-white/50 rounded-xl border p-2 items-center justify-between transition-all"><img id="previewImg" class="h-full rounded-lg object-cover"><button onclick="clearImage()" class="text-gray-400 hover:text-red-500 transition"><i class="fa-solid fa-xmark"></i></button></div>
-                    <div class="absolute bottom-5 right-5 left-5 flex items-center justify-between">
-                        <input type="file" id="imageInput" accept="image/*" class="hidden"><button onclick="document.getElementById('imageInput').click()" class="glass-panel border p-2 rounded-full text-purple-400 transition hover:bg-white/10 shadow-sm"><i class="fa-solid fa-camera text-xl"></i></button>
-                        <div class="flex items-center gap-3"><span id="statusMsg" class="text-xs text-purple-600 hidden">Analyzing...</span><button id="scanBtn" class="bg-purple-600 text-white px-6 py-2 rounded-full font-medium transition hover:bg-purple-700 active:scale-95 shadow-md">Analyze</button></div>
+                    <div class="absolute bottom-5 right-5 left-5 flex items-center justify-end gap-3">
+                        <span id="statusMsg" class="text-xs text-purple-600 hidden">Analyzing...</span>
+                        <input type="file" id="imageInput" accept="image/*" class="hidden">
+                        <!-- CIRCULAR CAMERA BUTTON -->
+                        <button onclick="document.getElementById('imageInput').click()" class="w-11 h-11 flex items-center justify-center glass-panel border rounded-full text-purple-400 transition hover:bg-white/10 shadow-sm flex-shrink-0">
+                            <i class="fa-solid fa-camera text-xl"></i>
+                        </button>
+                        <!-- ANALYZE BUTTON WITH SPARKLES -->
+                        <button id="scanBtn" class="bg-purple-600 text-white px-6 py-2 h-11 rounded-full font-medium transition hover:bg-purple-700 active:scale-95 shadow-md flex items-center gap-2">
+                            Analyze <i class="fa-solid fa-wand-magic-sparkles text-sm"></i>
+                        </button>
                     </div>
                 </div>
             </div>
