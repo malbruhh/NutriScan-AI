@@ -3,46 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NutriScan - Donut Tracker</title>
-    <!-- Tailwind CSS -->
+    <title>NutriScan - 3-Column Tracker</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #F3F4F6; }
-        .custom-scroll::-webkit-scrollbar { width: 6px; }
-        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        body { font-family: 'Inter', sans-serif; background-color: #b57edc; }
+        .custom-scroll::-webkit-scrollbar { width: 5px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 10px; }
         .fade-in { animation: fadeIn 0.3s ease-out forwards; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-
-        /* Branding Colors */
-        .bg-tracker { background-color: #FFF8F2; } 
-        .border-tracker { border-color: #FFE0C2; }
-        .text-tracker-title { color: #C05621; } 
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         
-        .bg-history { background-color: #F0FDF4; } 
-        .border-history { border-color: #DCFCE7; }
-        .text-history-title { color: #15803D; } 
-
-        .bg-ai { background-color: #FFFFFF; }
-        .border-ai { border-color: #E9D5FF; } 
-        .text-ai-title { color: #7E22CE; } 
-
-        /* Macro Colors */
-        .macro-p-bg { background-color: #EF4444; }
-        .macro-c-bg { background-color: #3B82F6; }
-        .macro-f-bg { background-color: #EAB308; }
+        .bg-tracker { background-color: #FFF8F2; } .border-tracker { border-color: #FFE0C2; }
+        .bg-history { background-color: #F0FDF4; } .border-history { border-color: #DCFCE7; }
+        
+        .modal-overlay { background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); }
+        
+        input[type=range] { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 5px; background: #e2e8f0; outline: none; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #ea580c; cursor: pointer; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
     </style>
 </head>
-<body class="h-screen flex flex-col p-4 lg:p-8 overflow-hidden">
+<body class="h-screen flex flex-col p-4 lg:p-8 overflow-hidden relative">
 
-    <!-- LOGO PLACEHOLDER -->
     <header class="mb-8 flex-shrink-0">
         <div class="w-[250px] h-[150px] bg-white border-2 border-dashed border-gray-300 rounded-3xl flex items-center justify-center text-gray-400 font-medium shadow-sm">
             <div class="text-center">
@@ -52,172 +36,180 @@
         </div>
     </header>
 
-    <!-- MAIN GRID CONTAINER -->
     <div class="flex-grow grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-0">
-
-        <!-- COLUMN 1: FOOD HISTORY (3/12) -->
         <div class="lg:col-span-3 h-full bg-history rounded-[32px] shadow-sm border border-history p-6 flex flex-col overflow-hidden">
             <div class="flex justify-between items-center mb-4">
-                <div class="flex items-center gap-3">
-                    <h2 class="text-history-title font-bold text-lg">Food History</h2>
-                    <button id="undoBtn" onclick="undoDelete()" class="hidden text-xs bg-white border border-green-200 text-green-700 hover:bg-green-50 px-2 py-1 rounded-lg flex items-center gap-1 transition shadow-sm">
-                        <i class="fa-solid fa-rotate-left"></i> Undo
-                    </button>
-                </div>
+                <h2 class="text-green-800 font-bold text-lg">History</h2>
                 <span id="itemCount" class="bg-green-600 text-white text-xs font-bold px-3 py-1 rounded-full">0 items</span>
             </div>
-            
             <div class="flex-grow overflow-y-auto custom-scroll pr-2">
                 <ul id="foodLog" class="space-y-3"></ul>
             </div>
         </div>
 
-        <!-- COLUMN 2: TRACKER & AI INPUT (5/12) -->
         <div class="lg:col-span-5 h-full flex flex-col gap-6 min-h-0">
-            
-            <!-- 1. CALORIE TRACKER (DONUT + BARS) -->
-            <div id="trackerCard" class="bg-tracker rounded-[32px] shadow-sm border border-tracker p-6 relative flex-shrink-0">
-                <div class="absolute top-6 right-6 flex gap-3 z-10">
-                    <button onclick="toggleGraphModal()" class="text-blue-400 hover:text-blue-600 transition">
-                        <i class="fa-regular fa-circle-question text-xl"></i>
-                    </button>
-                    <button onclick="toggleEditMode()" class="text-orange-400 hover:text-orange-600 transition">
-                        <i class="fa-solid fa-pencil text-lg"></i>
-                    </button>
-                </div>
-
-                <div id="trackerView">
-                    <div class="flex items-center gap-2 mb-4">
-                        <i class="fa-solid fa-bullseye text-orange-600 text-xl"></i>
-                        <h2 class="text-tracker-title font-bold text-lg">Daily Tracker</h2>
-                    </div>
-
-                    <div class="flex items-center gap-8">
-                        <!-- Donut Side -->
-                        <div class="relative w-40 h-40 flex-shrink-0">
-                            <canvas id="calorieDonut"></canvas>
-                            <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
-                                <span id="calFraction" class="text-sm font-bold text-gray-800 leading-tight">0/2000</span>
-                                <span class="text-[10px] text-gray-400 uppercase font-bold tracking-tight">kcal</span>
-                            </div>
-                        </div>
-
-                        <!-- Bars Side -->
-                        <div class="flex-grow space-y-4">
-                            <div>
-                                <div class="flex justify-between text-[11px] font-bold text-red-500 mb-1">
-                                    <span>PROTEIN</span>
-                                    <span><span id="displayP">0</span>g / 150g</span>
-                                </div>
-                                <div class="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden">
-                                    <div id="barP" class="h-full macro-p-bg transition-all duration-700" style="width: 0%"></div>
-                                </div>
-                            </div>
-                            <div>
-                                <div class="flex justify-between text-[11px] font-bold text-blue-500 mb-1">
-                                    <span>CARBS</span>
-                                    <span><span id="displayC">0</span>g / 200g</span>
-                                </div>
-                                <div class="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden">
-                                    <div id="barC" class="h-full macro-c-bg transition-all duration-700" style="width: 0%"></div>
-                                </div>
-                            </div>
-                            <div>
-                                <div class="flex justify-between text-[11px] font-bold text-yellow-600 mb-1">
-                                    <span>FAT</span>
-                                    <span><span id="displayF">0</span>g / 65g</span>
-                                </div>
-                                <div class="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden">
-                                    <div id="barF" class="h-full macro-f-bg transition-all duration-700" style="width: 0%"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mt-4 pt-4 border-t border-orange-100 flex justify-center gap-4 text-sm text-gray-500 font-medium">
-                        <span>Consumed: <span id="displayCals" class="text-orange-700 font-bold">0</span> kcal</span>
-                        <span class="text-gray-300">|</span>
-                        <span>Target: <span id="targetCals" class="text-gray-800">2000</span> kcal</span>
-                    </div>
-                </div>
-
-                <div id="trackerEdit" class="hidden">
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-tracker-title font-bold text-lg">Settings</h2>
-                        <div class="flex gap-2">
-                            <button onclick="saveProfile()" class="text-green-600 font-medium text-sm flex items-center gap-1"><i class="fa-solid fa-check"></i> Save</button>
-                            <button onclick="toggleEditMode()" class="text-red-500 font-medium text-sm flex items-center gap-1"><i class="fa-solid fa-xmark"></i> Cancel</button>
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-1 gap-4">
-                        <label class="block">
-                            <span class="text-xs font-bold text-gray-400 uppercase">Daily Calorie Goal</span>
-                            <input type="number" id="editTotal" placeholder="2000" class="w-full mt-1 p-3 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-orange-200">
-                        </label>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 2. AI ANALYSIS BOX -->
-            <div class="bg-ai rounded-[32px] shadow-sm border border-ai p-6 flex flex-col flex-grow relative overflow-hidden">
-                <div class="flex items-center gap-2 mb-4">
-                    <i class="fa-solid fa-wand-magic-sparkles text-purple-600 text-xl"></i>
-                    <h2 class="text-ai-title font-bold text-lg">AI Food Analysis</h2>
-                </div>
-                
-                <div class="flex-grow relative flex flex-col">
-                    <textarea id="userInput" 
-                        class="w-full h-full p-5 pb-24 text-gray-700 bg-purple-50/50 rounded-2xl border border-purple-100 focus:outline-none focus:ring-2 focus:ring-purple-200 resize-none placeholder-gray-400 text-base leading-relaxed transition-all"
-                        placeholder="Describe your food..."></textarea>
-                    
-                    <div id="imagePreviewContainer" class="hidden absolute bottom-20 left-5 right-5 h-24 bg-white rounded-xl border border-purple-100 p-2 shadow-sm items-center justify-between z-10">
-                        <img id="previewImg" src="" class="h-full rounded-lg object-cover border border-gray-200">
-                        <button onclick="clearImage()" class="text-gray-400 hover:text-red-500 p-2"><i class="fa-solid fa-xmark"></i></button>
-                    </div>
-
-                    <div class="absolute bottom-5 right-5 left-5 flex items-center justify-between">
-                        <input type="file" id="imageInput" accept="image/*" class="hidden">
-                        <button onclick="document.getElementById('imageInput').click()" 
-                            class="text-purple-400 hover:text-purple-600 transition p-2.5 rounded-full hover:bg-purple-100 bg-white border border-purple-100 shadow-sm">
-                            <i class="fa-solid fa-camera text-xl"></i>
+            <div id="trackerCardContainer" class="relative">
+                <div class="bg-tracker rounded-[32px] shadow-sm border border-tracker p-6 relative flex-shrink-0">
+                    <div class="absolute top-6 right-6 flex gap-3 z-10">
+                        <button onclick="toggleEditMode()" id="editBtn" class="bg-orange-100 text-orange-600 hover:bg-orange-200 w-10 h-10 rounded-full flex items-center justify-center transition active:scale-90">
+                            <i class="fa-solid fa-pen text-sm"></i>
                         </button>
-                        <div class="flex items-center gap-3">
-                            <span id="statusMsg" class="text-sm text-purple-600 font-medium hidden animate-pulse">Analyzing...</span>
-                            <button id="scanBtn" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2.5 rounded-full shadow-lg transition-all flex items-center gap-2 font-medium">
-                                <i class="fa-solid fa-magnifying-glass"></i>
-                                <span>Analyze</span>
-                            </button>
+                    </div>
+
+                    <div id="trackerView">
+                        <h2 class="text-orange-800 font-bold text-lg mb-4"><i class="fa-solid fa-fire mr-2"></i>Calorie Tracker</h2>
+                        <div class="flex items-center gap-8">
+                            <div class="relative w-40 h-40 flex-shrink-0">
+                                <canvas id="calorieDonut"></canvas>
+                                <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
+                                    <span id="calFraction" class="text-sm font-bold text-gray-800 leading-tight">0/2000</span>
+                                    <span class="text-[10px] text-gray-400 uppercase font-bold tracking-tight">kcal</span>
+                                </div>
+                            </div>
+                            <div class="flex-grow space-y-4">
+                                <div>
+                                    <div class="flex justify-between text-[11px] font-bold text-red-500 mb-1">
+                                        <span>PROTEIN</span>
+                                        <span><span id="displayP">0</span>/<span id="targetP">100</span> g</span>
+                                    </div>
+                                    <div class="w-full h-2 bg-gray-200 rounded-full overflow-hidden"><div id="barP" class="h-full bg-red-500 transition-all duration-700"></div></div>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between text-[11px] font-bold text-blue-500 mb-1">
+                                        <span>CARBS</span>
+                                        <span><span id="displayC">0</span>/<span id="targetC">250</span> g</span>
+                                    </div>
+                                    <div class="w-full h-2 bg-gray-200 rounded-full overflow-hidden"><div id="barC" class="h-full bg-blue-500 transition-all duration-700"></div></div>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between text-[11px] font-bold text-yellow-600 mb-1">
+                                        <span>FAT</span>
+                                        <span><span id="displayF">0</span>/<span id="targetF">66</span> g</span>
+                                    </div>
+                                    <div class="w-full h-2 bg-gray-200 rounded-full overflow-hidden"><div id="barF" class="h-full bg-yellow-500 transition-all duration-700"></div></div>
+                                </div>
+                            </div>
                         </div>
+                        <div class="mt-4 pt-4 border-t border-orange-100 flex justify-center gap-4 text-xs text-gray-500">
+                            <span>Consumed: <b id="displayCals" class="text-orange-700">0</b> kcal</span>
+                            <span class="text-gray-300">|</span>
+                            <span>Target: <b id="targetCals" class="text-gray-800">2000</b> kcal</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- EDIT INTAKE MODAL -->
+                <div id="editModal" class="hidden absolute top-0 right-0 w-[420px] bg-white rounded-3xl shadow-2xl border border-gray-200 z-50 overflow-hidden transform origin-top-right transition-all">
+                    <div class="bg-orange-50 p-4 border-b border-orange-100 flex justify-between items-center">
+                        <h3 class="font-bold text-orange-800">Edit Intake</h3>
+                        <button onclick="toggleEditMode()" class="text-gray-400 hover:text-red-500 transition"><i class="fa-solid fa-xmark text-xl"></i></button>
+                    </div>
+                    
+                    <div class="relative flex border-b text-sm font-medium">
+                        <button onclick="switchTab('basic')" id="basicTabBtn" class="flex-1 py-3 text-orange-600 transition-colors duration-300">Basic</button>
+                        <button onclick="switchTab('advanced')" id="advancedTabBtn" class="flex-1 py-3 text-gray-400 hover:text-gray-600 transition-colors duration-300">Advanced</button>
+                        <!-- Sliding Indicator -->
+                        <div id="tabIndicator" class="absolute bottom-0 left-0 w-1/2 h-0.5 bg-orange-500 transition-all duration-300 ease-out"></div>
+                    </div>
+
+                    <div class="p-6 max-h-[450px] overflow-y-auto custom-scroll">
+                        <div id="basicTabContent" class="space-y-5">
+                            <div class="space-y-4">
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="space-y-1">
+                                        <label class="text-[10px] font-bold text-gray-400 uppercase">Weight (kg)</label>
+                                        <input type="number" id="userWeight" value="70" class="w-full p-2 bg-gray-50 border rounded-xl text-sm outline-none">
+                                    </div>
+                                    <div class="space-y-1">
+                                        <label class="text-[10px] font-bold text-gray-400 uppercase">Height (cm)</label>
+                                        <input type="number" id="userHeight" value="170" class="w-full p-2 bg-gray-50 border rounded-xl text-sm outline-none">
+                                    </div>
+                                    <div class="space-y-1">
+                                        <label class="text-[10px] font-bold text-gray-400 uppercase">Age</label>
+                                        <input type="number" id="userAge" value="25" class="w-full p-2 bg-gray-50 border rounded-xl text-sm outline-none">
+                                    </div>
+                                    <div class="space-y-1">
+                                        <label class="text-[10px] font-bold text-gray-400 uppercase">Gender</label>
+                                        <select id="userGender" class="w-full p-2 bg-gray-50 border rounded-xl text-sm outline-none"><option value="male">Male</option><option value="female">Female</option></select>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <button onclick="setGoalPreset('cut', this)" class="preset-btn p-2 border rounded-xl text-xs bg-orange-50 text-orange-700 font-bold transition-all duration-200 hover:scale-[1.02]">Cutting</button>
+                                    <button onclick="setGoalPreset('maintain', this)" class="preset-btn p-2 border rounded-xl text-xs bg-orange-50 text-orange-700 font-bold transition-all duration-200 hover:scale-[1.02]">Maintain</button>
+                                    <button onclick="setGoalPreset('bulk', this)" class="preset-btn p-2 border rounded-xl text-xs bg-orange-50 text-orange-700 font-bold transition-all duration-200 hover:scale-[1.02]">Bulking</button>
+                                    <button onclick="setGoalPreset('athlete', this)" class="preset-btn p-2 border rounded-xl text-xs bg-orange-50 text-orange-700 font-bold transition-all duration-200 hover:scale-[1.02]">Gym Goer</button>
+                                </div>
+                            </div>
+
+                            <div class="relative flex items-center py-4 -mx-6">
+                                <div class="flex-grow border-t border-gray-100"></div>
+                                <span class="flex-shrink mx-4 text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] bg-white px-2">or</span>
+                                <div class="flex-grow border-t border-gray-100"></div>
+                            </div>
+
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-400 uppercase mb-2 block">Manual Calorie Target (kcal)</label>
+                                <input type="number" id="editTotal" class="w-full p-3 bg-gray-50 border rounded-xl text-lg font-bold text-orange-700 outline-none focus:ring-2 focus:ring-orange-200 transition-all">
+                            </div>
+                        </div>
+
+                        <div id="advancedTabContent" class="hidden space-y-6">
+                            <div class="space-y-4">
+                                <div class="space-y-2">
+                                    <div class="flex justify-between text-xs font-bold text-red-500"><span>Protein (%)</span> <span id="label-p">20% (100g)</span></div>
+                                    <input type="range" id="slider-p" min="0" max="100" value="20">
+                                </div>
+                                <div class="space-y-2">
+                                    <div class="flex justify-between text-xs font-bold text-blue-500"><span>Carbs (%)</span> <span id="label-c">50% (250g)</span></div>
+                                    <input type="range" id="slider-c" min="0" max="100" value="50">
+                                </div>
+                                <div class="space-y-2">
+                                    <div class="flex justify-between text-xs font-bold text-yellow-600"><span>Fat (%)</span> <span id="label-f">30% (66g)</span></div>
+                                    <input type="range" id="slider-f" min="0" max="100" value="30">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-4 bg-gray-50 border-t flex items-center justify-between">
+                        <div class="group relative">
+                            <i class="fa-solid fa-circle-info text-gray-300 hover:text-orange-500 transition cursor-help text block text-lg"></i>
+                            <div class="absolute bottom-full left-0 mb-2 w-48 p-3 bg-gray-800 text-white text-[10px] rounded-lg opacity-0 group-hover:opacity-100 transition pointer-events-none shadow-xl z-50">
+                                <p class="font-bold border-b border-gray-600 mb-1 pb-1">Calorie Logic:</p>
+                                <ul class="space-y-1"><li>• 1g Protein = 4 kcal</li><li>• 1g Carbs = 4 kcal</li><li>• 1g Fat = 9 kcal</li></ul>
+                                <p class="mt-2 text-gray-400">Values are calculated to match your total target.</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-3">
+                            <button onclick="toggleEditMode()" class="px-5 py-2 text-gray-500 font-bold text-sm hover:text-gray-700 transition">Cancel</button>
+                            <button onclick="saveIntake()" class="px-6 py-2 bg-orange-600 text-white rounded-xl font-bold text-sm shadow-md hover:bg-orange-700 transition active:scale-95">Save Changes</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-[32px] shadow-sm border border-purple-100 p-6 flex flex-col flex-grow relative overflow-hidden">
+                <h2 class="text-purple-700 font-bold text-lg mb-4"><i class="fa-solid fa-wand-magic-sparkles mr-2"></i>AI Analysis</h2>
+                <div class="flex-grow flex flex-col relative">
+                    <textarea id="userInput" class="w-full h-full p-5 pb-24 text-gray-700 bg-purple-50/50 rounded-2xl border border-purple-100 focus:outline-none resize-none" placeholder="Describe your food..."></textarea>
+                    <div id="imagePreviewContainer" class="hidden absolute bottom-20 left-5 right-5 h-24 bg-white rounded-xl border p-2 items-center justify-between"><img id="previewImg" class="h-full rounded-lg object-cover"><button onclick="clearImage()" class="text-gray-400"><i class="fa-solid fa-xmark"></i></button></div>
+                    <div class="absolute bottom-5 right-5 left-5 flex items-center justify-between">
+                        <input type="file" id="imageInput" accept="image/*" class="hidden"><button onclick="document.getElementById('imageInput').click()" class="bg-white border p-2 rounded-full shadow-sm text-purple-400 transition hover:bg-purple-50"><i class="fa-solid fa-camera text-xl"></i></button>
+                        <div class="flex items-center gap-3"><span id="statusMsg" class="text-xs text-purple-600 hidden">Analyzing...</span><button id="scanBtn" class="bg-purple-600 text-white px-6 py-2 rounded-full font-medium transition hover:bg-purple-700 active:scale-95">Analyze</button></div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- COLUMN 3: PLACEHOLDER (4/12) -->
         <div class="lg:col-span-4 h-full bg-white rounded-[32px] shadow-sm border border-gray-200 p-8 flex flex-col items-center justify-center text-gray-300">
-            <div class="text-center">
-                <i class="fa-solid fa-layer-group text-6xl mb-4 text-gray-100"></i>
-                <h3 class="text-xl font-bold text-gray-400">Right Column</h3>
-                <p class="text-sm">Additional Metrics & Widgets</p>
-            </div>
+            <i class="fa-solid fa-layer-group text-6xl mb-4 opacity-20"></i>
+            <h3 class="text-xl font-bold">Right Column</h3><p class="text-sm">Future Widgets</p>
         </div>
     </div>
 
-    <!-- MODAL: FUZZY GRAPH -->
-    <div id="graphModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50 backdrop-blur-sm transition-opacity">
-        <div class="bg-white rounded-3xl p-8 w-full max-w-lg shadow-2xl relative">
-            <button onclick="toggleGraphModal()" class="absolute top-5 right-5 text-gray-300 hover:text-gray-500 transition">
-                <i class="fa-solid fa-xmark text-2xl"></i>
-            </button>
-            <div class="mb-6">
-                <h3 class="text-xl font-bold text-gray-800">Food Grade Calculator</h3>
-                <p class="text-sm text-gray-500 mt-1">Fuzzy Logic Evaluation</p>
-            </div>
-            <div class="relative h-64 w-full bg-slate-50 rounded-xl border border-slate-100 p-2">
-                <canvas id="fuzzyChart"></canvas>
-            </div>
-        </div>
-    </div>
+    <div id="modalOverlay" onclick="toggleEditMode()" class="hidden fixed inset-0 modal-overlay z-40 transition-opacity"></div>
+
+    <div id="graphModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50 backdrop-blur-sm"><div class="bg-white rounded-3xl p-8 w-full max-w-lg shadow-2xl relative"><button onclick="toggleGraphModal()" class="absolute top-5 right-5 text-gray-300"><i class="fa-solid fa-xmark text-2xl"></i></button><h3 class="text-xl font-bold mb-6">Food Grade Calculator</h3><div class="relative h-64 w-full"><canvas id="fuzzyChart"></canvas></div></div></div>
 
     <script src="app.js"></script>
 </body>

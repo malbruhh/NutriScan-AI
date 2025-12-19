@@ -1,7 +1,12 @@
 const API_URL = "http://localhost:8000/analyze"; 
 
 // --- State Management ---
-let targets = { cals: 2000, p: 150, c: 200, f: 65 };
+let targets = { 
+    cals: 2000, 
+    p: 100, 
+    c: 250, 
+    f: 66 
+}; 
 let current = { cals: 0, p: 0, c: 0, f: 0 };
 let history = [];
 let chartInstance = null; // Fuzzy Graph
@@ -12,31 +17,26 @@ let currentImageBase64 = null;
 
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
-    initDonutChart(); // Initialize the donut UI
+    initDonutChart(); 
     updateDashboard(); 
+    setupSliderListeners();
     
-    const scanBtn = document.getElementById('scanBtn');
-    if (scanBtn) scanBtn.addEventListener('click', analyzeFood);
+    document.getElementById('scanBtn')?.addEventListener('click', analyzeFood);
 
-    const userInput = document.getElementById('userInput');
-    if (userInput) {
-        userInput.addEventListener('keypress', (e) => {
-            if(e.key === 'Enter' && !e.shiftKey) { 
-                e.preventDefault(); 
-                analyzeFood(); 
-            }
-        });
-    }
+    document.getElementById('userInput')?.addEventListener('keypress', (e) => {
+        if(e.key === 'Enter' && !e.shiftKey) { 
+            e.preventDefault(); 
+            analyzeFood(); 
+        }
+    });
 
-    const imgInput = document.getElementById('imageInput');
-    if (imgInput) imgInput.addEventListener('change', handleImageSelect);
+    document.getElementById('imageInput')?.addEventListener('change', handleImageSelect);
 });
 
 // --- Image Handling ---
 function handleImageSelect(event) {
     const file = event.target.files[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = function(e) {
         currentImageBase64 = e.target.result;
@@ -51,7 +51,8 @@ function handleImageSelect(event) {
 
 window.clearImage = function() {
     currentImageBase64 = null;
-    document.getElementById('imageInput').value = ""; 
+    const input = document.getElementById('imageInput');
+    if (input) input.value = ""; 
     const container = document.getElementById('imagePreviewContainer');
     container.classList.add('hidden');
     container.classList.remove('flex');
@@ -67,7 +68,7 @@ async function analyzeFood() {
 
     btn.disabled = true;
     btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>`;
-    status.classList.remove('hidden');
+    status?.classList.remove('hidden');
     
     try {
         const payload = { text: input, image: currentImageBase64 };
@@ -77,10 +78,7 @@ async function analyzeFood() {
             body: JSON.stringify(payload) 
         });
 
-        if (!response.ok) {
-            const err = await response.json();
-            throw new Error(err.detail || "Server Error");
-        }
+        if (!response.ok) throw new Error("Server Error");
 
         const data = await response.json();
         const items = Array.isArray(data) ? data : [data];
@@ -99,21 +97,16 @@ async function analyzeFood() {
         renderHistory();
         updateDashboard();
         updateChart(); 
-        
         clearImage();
         document.getElementById('userInput').value = ''; 
-
-        lastDeleted = null;
-        const undoBtn = document.getElementById('undoBtn');
-        if(undoBtn) undoBtn.classList.add('hidden');
 
     } catch (error) {
         console.error(error);
         alert("Error: " + error.message);
     } finally {
         btn.disabled = false;
-        btn.innerHTML = `<i class="fa-solid fa-magnifying-glass"></i><span>Analyze</span>`;
-        status.classList.add('hidden');
+        btn.innerHTML = `Analyze`;
+        status?.classList.add('hidden');
     }
 }
 
@@ -121,13 +114,13 @@ async function analyzeFood() {
 function renderHistory() {
     const list = document.getElementById('foodLog');
     const countEl = document.getElementById('itemCount');
+    if (!list) return;
     
     list.innerHTML = '';
     countEl.innerText = `${history.length} items`;
 
     history.forEach((item, index) => {
         const fuzzy = calculateFuzzyHealth(item.calories, item.protein, item.fats, item.carbs);
-        
         const li = document.createElement('li');
         li.className = "bg-white p-4 rounded-2xl border border-green-100 shadow-sm fade-in group relative hover:shadow-md transition-all";
         li.innerHTML = `
@@ -156,41 +149,26 @@ function renderHistory() {
 
 window.deleteItem = function(index) {
     const item = history[index];
-    lastDeleted = { item: item, index: index };
     current.cals -= item.calories;
     current.p -= item.protein;
     current.c -= item.carbs;
     current.f -= item.fats;
     history.splice(index, 1);
-    const undoBtn = document.getElementById('undoBtn');
-    if (undoBtn) undoBtn.classList.remove('hidden');
-    renderHistory();
-    updateDashboard();
-};
-
-window.undoDelete = function() {
-    if (!lastDeleted) return;
-    const { item, index } = lastDeleted;
-    current.cals += item.calories;
-    current.p += item.protein;
-    current.c += item.carbs;
-    current.f += item.fats;
-    history.splice(index, 0, item);
-    lastDeleted = null;
-    document.getElementById('undoBtn').classList.add('hidden');
     renderHistory();
     updateDashboard();
 };
 
 function initDonutChart() {
-    const ctx = document.getElementById('calorieDonut').getContext('2d');
+    const canvas = document.getElementById('calorieDonut');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
     donutChartInstance = new Chart(ctx, {
         type: 'doughnut',
         data: {
             labels: ['Protein', 'Carbs', 'Fat', 'Remaining'],
             datasets: [{
                 data: [0, 0, 0, targets.cals],
-                backgroundColor: ['#EF4444', '#3B82F6', '#EAB308', '#E5E7EB'],
+                backgroundColor: ['#EF4444', '#3B82F6', '#EAB308', '#F3F4F6'],
                 borderWidth: 0,
                 hoverOffset: 4,
                 cutout: '75%'
@@ -212,40 +190,202 @@ function updateDashboard() {
     const pCals = Math.round(current.p * 4);
     const cCals = Math.round(current.c * 4);
     const fCals = Math.round(current.f * 9);
-    
-    // We calculate remaining by subtracting consumed from target
     const remaining = Math.max(0, targets.cals - consumed);
 
-    // Update Text
     document.getElementById('displayCals').innerText = consumed;
     document.getElementById('targetCals').innerText = targets.cals;
     document.getElementById('displayP').innerText = Math.round(current.p);
     document.getElementById('displayC').innerText = Math.round(current.c);
     document.getElementById('displayF').innerText = Math.round(current.f);
     
-    // Update Donut Center Text: "xx/xx"
+    document.getElementById('targetP').innerText = targets.p;
+    document.getElementById('targetC').innerText = targets.c;
+    document.getElementById('targetF').innerText = targets.f;
+
     document.getElementById('calFraction').innerText = `${consumed}/${targets.cals}`;
 
-    // Update Donut Chart Data
     if (donutChartInstance) {
         donutChartInstance.data.datasets[0].data = [pCals, cCals, fCals, remaining];
         donutChartInstance.update();
     }
 
-    // Update Progress Bars (Right side)
     const calcPct = (val, target) => Math.min(100, Math.max(0, (val / target) * 100)) + '%';
     document.getElementById('barP').style.width = calcPct(current.p, targets.p);
     document.getElementById('barC').style.width = calcPct(current.c, targets.c);
     document.getElementById('barF').style.width = calcPct(current.f, targets.f);
 }
 
+// --- MODAL & EDITOR LOGIC ---
+
+window.toggleEditMode = function() {
+    const modal = document.getElementById('editModal');
+    const overlay = document.getElementById('modalOverlay');
+    if (modal.classList.contains('hidden')) {
+        document.getElementById('editTotal').value = targets.cals;
+        updateAdvancedSlidersFromGrams();
+        modal.classList.remove('hidden');
+        overlay.classList.remove('hidden');
+        modal.classList.add('fade-in');
+    } else {
+        modal.classList.add('hidden');
+        overlay.classList.add('hidden');
+    }
+};
+
+window.switchTab = function(tab) {
+    const basicContent = document.getElementById('basicTabContent');
+    const advancedContent = document.getElementById('advancedTabContent');
+    const basicBtn = document.getElementById('basicTabBtn');
+    const advancedBtn = document.getElementById('advancedTabBtn');
+    const indicator = document.getElementById('tabIndicator');
+
+    if (tab === 'basic') {
+        basicContent.classList.remove('hidden');
+        advancedContent.classList.add('hidden');
+        basicBtn.classList.add('text-orange-600');
+        basicBtn.classList.remove('text-gray-400');
+        advancedBtn.classList.remove('text-orange-600');
+        advancedBtn.classList.add('text-gray-400');
+        indicator.style.transform = 'translateX(0%)';
+        
+        basicContent.classList.remove('fade-in');
+        void basicContent.offsetWidth; // Trigger reflow
+        basicContent.classList.add('fade-in');
+    } else {
+        advancedContent.classList.remove('hidden');
+        basicContent.classList.add('hidden');
+        advancedBtn.classList.add('text-orange-600');
+        advancedBtn.classList.remove('text-gray-400');
+        basicBtn.classList.remove('text-orange-600');
+        basicBtn.classList.add('text-gray-400');
+        indicator.style.transform = 'translateX(100%)';
+        
+        updateAdvancedSlidersFromGrams();
+        advancedContent.classList.remove('fade-in');
+        void advancedContent.offsetWidth; // Trigger reflow
+        advancedContent.classList.add('fade-in');
+    }
+};
+
+function setupSliderListeners() {
+    const sliders = ['p', 'c', 'f'];
+    sliders.forEach(key => {
+        const slider = document.getElementById(`slider-${key}`);
+        slider?.addEventListener('input', () => handleSliderChange(key));
+    });
+    document.getElementById('editTotal')?.addEventListener('input', updateAdvancedGramLabels);
+}
+
+function handleSliderChange(changedKey) {
+    const pVal = parseInt(document.getElementById('slider-p').value);
+    const cVal = parseInt(document.getElementById('slider-c').value);
+    const fVal = parseInt(document.getElementById('slider-f').value);
+    
+    let total = pVal + cVal + fVal;
+    if (total !== 100) {
+        const keys = ['p', 'c', 'f'];
+        const changedIdx = keys.indexOf(changedKey);
+        const nextIdx = (changedIdx + 1) % 3;
+        const thirdIdx = (changedIdx + 2) % 3;
+        
+        let remaining = 100 - parseInt(document.getElementById(`slider-${changedKey}`).value);
+        const currentNext = parseInt(document.getElementById(`slider-${keys[nextIdx]}`).value);
+        const currentThird = parseInt(document.getElementById(`slider-${keys[thirdIdx]}`).value);
+        const sum = currentNext + currentThird || 1;
+        
+        const newNext = Math.round(remaining * (currentNext / sum));
+        const newThird = 100 - parseInt(document.getElementById(`slider-${changedKey}`).value) - newNext;
+        
+        document.getElementById(`slider-${keys[nextIdx]}`).value = newNext;
+        document.getElementById(`slider-${keys[thirdIdx]}`).value = newThird;
+    }
+    
+    updateAdvancedGramLabels();
+}
+
+function updateAdvancedSlidersFromGrams() {
+    const totalCals = targets.cals;
+    const pPct = Math.round((targets.p * 4 / totalCals) * 100);
+    const fPct = Math.round((targets.f * 9 / totalCals) * 100);
+    const cPct = 100 - pPct - fPct;
+
+    document.getElementById('slider-p').value = pPct;
+    document.getElementById('slider-c').value = cPct;
+    document.getElementById('slider-f').value = fPct;
+    updateAdvancedGramLabels();
+}
+
+function updateAdvancedGramLabels() {
+    const total = parseInt(document.getElementById('editTotal').value) || 2000;
+    const pPct = parseInt(document.getElementById('slider-p').value);
+    const cPct = parseInt(document.getElementById('slider-c').value);
+    const fPct = parseInt(document.getElementById('slider-f').value);
+
+    const labels = {
+        p: document.getElementById('label-p'),
+        c: document.getElementById('label-c'),
+        f: document.getElementById('label-f')
+    };
+
+    labels.p.innerText = `${pPct}% (${Math.round((total * pPct / 100) / 4)}g)`;
+    labels.c.innerText = `${cPct}% (${Math.round((total * cPct / 100) / 4)}g)`;
+    labels.f.innerText = `${fPct}% (${Math.round((total * fPct / 100) / 9)}g)`;
+}
+
+window.setGoalPreset = function(type, element) {
+    const weight = parseFloat(document.getElementById('userWeight').value) || 70;
+    const height = parseFloat(document.getElementById('userHeight').value) || 170;
+    const age = parseInt(document.getElementById('userAge').value) || 25;
+    const gender = document.getElementById('userGender').value;
+    
+    let bmr = (10 * weight) + (6.25 * height) - (5 * age);
+    bmr += (gender === 'male' ? 5 : -161);
+    let tdee = Math.round(bmr * 1.375);
+
+    if (type === 'cut') tdee -= 400;
+    if (type === 'bulk') tdee += 300;
+    if (type === 'athlete') tdee += 600;
+
+    document.getElementById('editTotal').value = tdee;
+    
+    let ratios = { p: 20, c: 50, f: 30 };
+    if (type === 'cut') ratios = { p: 35, c: 35, f: 30 };
+    if (type === 'bulk') ratios = { p: 20, c: 60, f: 20 };
+    if (type === 'athlete') ratios = { p: 25, c: 50, f: 25 };
+
+    document.getElementById('slider-p').value = ratios.p;
+    document.getElementById('slider-c').value = ratios.c;
+    document.getElementById('slider-f').value = ratios.f;
+    updateAdvancedGramLabels();
+    
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+        btn.classList.remove('bg-orange-600', 'text-white', 'shadow-md');
+        btn.classList.add('bg-orange-50', 'text-orange-700');
+    });
+    element.classList.add('bg-orange-600', 'text-white', 'shadow-md');
+    element.classList.remove('bg-orange-50', 'text-orange-700');
+};
+
+window.saveIntake = function() {
+    const total = parseInt(document.getElementById('editTotal').value) || 2000;
+    const pPct = parseInt(document.getElementById('slider-p').value);
+    const cPct = parseInt(document.getElementById('slider-c').value);
+    const fPct = parseInt(document.getElementById('slider-f').value);
+
+    targets.cals = total;
+    targets.p = Math.round((total * pPct / 100) / 4);
+    targets.c = Math.round((total * cPct / 100) / 4);
+    targets.f = Math.round((total * fPct / 100) / 9);
+
+    window.toggleEditMode();
+    updateDashboard();
+};
+
 // --- Fuzzy Logic Engine ---
 function calculateFuzzyHealth(calories=0, protein=0, fats=0, carbs=0) {
     const tri = (val, low, peak, high) => {
         if (val <= low || val >= high) return 0;
-        if (val === peak) return 1;
-        if (val < peak) return (val - low) / (peak - low);
-        return (high - val) / (high - peak);
+        return val < peak ? (val - low) / (peak - low) : (high - val) / (high - peak);
     };
     const trapLow = (val, peak, high) => (val <= peak ? 1 : val >= high ? 0 : (high - val) / (high - peak));
     const trapHigh = (val, low, peak) => (val >= peak ? 1 : val <= low ? 0 : (val - low) / (peak - low));
@@ -273,7 +413,6 @@ function calculateFuzzyHealth(calories=0, protein=0, fats=0, carbs=0) {
     return { score, category: "Junk Food", colorName: "red" };
 }
 
-// --- Chart Visuals ---
 window.toggleGraphModal = function() {
     const modal = document.getElementById('graphModal');
     if (modal.classList.contains('hidden')) {
@@ -296,7 +435,7 @@ function initChart() {
     chartInstance = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: labels,
+            labels,
             datasets: [
                 { label: 'Junk', data: junkData, borderColor: '#EF4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', fill: true, pointRadius: 0 },
                 { label: 'Not Healthy', data: notHealthyData, borderColor: '#F97316', backgroundColor: 'rgba(249, 115, 22, 0.1)', fill: true, pointRadius: 0 },
@@ -312,38 +451,8 @@ function initChart() {
                 x: { title: { display: true, text: 'Health Score (0-100)' } }
             },
             plugins: { legend: { display: false } }
-        },
-        plugins: [{
-            id: 'cursor',
-            afterDraw: (chart) => {
-                const ctx = chart.ctx;
-                const x = chart.scales.x.getPixelForValue(lastScore);
-                ctx.save();
-                ctx.beginPath();
-                ctx.moveTo(x, chart.chartArea.top);
-                ctx.lineTo(x, chart.chartArea.bottom);
-                ctx.lineWidth = 2;
-                ctx.strokeStyle = '#000';
-                ctx.setLineDash([5, 3]);
-                ctx.stroke();
-                ctx.restore();
-            }
-        }]
+        }
     });
 }
 
-function updateChart() {
-    if (chartInstance) chartInstance.update();
-}
-
-window.toggleEditMode = function() {
-    const view = document.getElementById('trackerView');
-    const edit = document.getElementById('trackerEdit');
-    edit.classList.toggle('hidden');
-    view.classList.toggle('hidden');
-};
-window.saveProfile = function() {
-    targets.cals = parseInt(document.getElementById('editTotal').value) || 2000;
-    updateDashboard();
-    window.toggleEditMode();
-};
+function updateChart() { chartInstance?.update(); }
