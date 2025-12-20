@@ -28,6 +28,7 @@
             z-index: -1;
             opacity: 0;
             transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        
         }
 
         body.theme-dark { color: #f8fafc; }
@@ -136,6 +137,23 @@
 
         input[type=range] { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 5px; background: #e2e8f0; outline: none; }
         input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #ea580c; cursor: pointer; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+        
+        #fuzzyPanel canvas {
+            width: 100%;
+            height: 130px;
+        }
+
+        #sugenoCalc {
+            line-height: 1.4;
+        }
+
+        .fade-soft {
+            opacity: 0.15 !important;
+        }
+
+        .highlight {
+            opacity: 0.45 !important;
+        }
     </style>
 </head>
 <body class="h-screen flex flex-col p-4 lg:p-8 overflow-hidden relative">
@@ -160,9 +178,13 @@
     <div class="flex-grow grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-0">
         <!-- COLUMN 1: HISTORY -->
         <div class="lg:col-span-3 h-full glass-panel bg-history p-6 flex flex-col overflow-hidden shadow-sm">
-            <div class="flex justify-between items-center mb-4">
+            <div class="flex justify-between items-center mb-4 gap-2">
                 <h2 class="text-green-800 font-bold text-lg">History</h2>
-                <span id="itemCount" class="bg-green-600 text-white text-xs font-bold px-3 py-1 rounded-full">0 items</span>
+                <div class="flex items-center gap-2">
+                    <button id="undoBtn" class="hidden text-xs bg-gray-800 text-white px-3 py-1 rounded-full hover:bg-gray-700 transition">Undo</button>
+                    <span id="itemCount"
+                    class="bg-green-600 text-white text-xs font-bold px-3 py-1 rounded-full">0 items</span>
+                </div>
             </div>
             <div class="flex-grow overflow-y-auto custom-scroll pr-2">
                 <ul id="foodLog" class="space-y-3"></ul>
@@ -330,9 +352,17 @@
             </div>
         </div>
 
-        <div class="lg:col-span-4 h-full glass-panel bg-white rounded-[32px] shadow-sm border border-gray-200 p-8 flex flex-col items-center justify-center text-gray-400">
-            <i class="fa-solid fa-layer-group text-6xl mb-4 opacity-10"></i>
-            <h3 class="text-xl font-bold opacity-30 tracking-tight">Right Column</h3><p class="text-sm opacity-20">Future Widgets</p>
+        <div class="lg:col-span-4 h-full glass-panel bg-white rounded-[32px] shadow-sm border border-gray-200 p-6 overflow-y-auto">
+            <h3 class="font-bold text-slate-700 mb-4 text-sm uppercase tracking-wide">
+                Fuzzy Logic Explainability</h3>
+            <div id="fuzzyPanel" class="flex flex-col gap-6">
+                <canvas id="calGraph"></canvas>
+                <canvas id="proGraph"></canvas>
+                <canvas id="fatGraph"></canvas>
+                <canvas id="sugGraph"></canvas>
+                <div id="sugenoCalc" class="text-xs bg-slate-100 rounded-xl p-3 font-mono text-slate-700">Sugeno calculation will appear here.</div>
+                <canvas id="outputGraph"></canvas>
+            </div>
         </div>
     </div>
 

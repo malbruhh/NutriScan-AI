@@ -1,46 +1,41 @@
 const API_URL = "http://localhost:8000/analyze"; 
 
-// --- State Management ---
+// --- Default State Management ---
 let targets = { 
     cals: 2000, 
     p: 100, 
     c: 250, 
     f: 66 
 }; 
-let current = { cals: 0, p: 0, c: 0, f: 0 };
+// Added 's' for sugar tracking in state
+let current = { cals: 0, p: 0, c: 0, f: 0, s: 0 };
 let history = [];
-let chartInstance = null; // Fuzzy Graph
-let donutChartInstance = null; // Calorie Donut
+let chartInstance = null; 
+let donutChartInstance = null; 
 let lastScore = 50; 
-let lastDeleted = null;
 let currentImageBase64 = null; 
 let currentTheme = 'light';
-
+let lastDeletedItem = null;
+let undoTimer = null;
+let outputChart = null;
 const MAX_HISTORY_LENGTH = 100;
 
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Initialize Theme from storage
     const savedTheme = localStorage.getItem('nutriscan_theme') || 'light';
     applyTheme(savedTheme);
-
-    // 2. Load Session Data
     loadSession();
-
-    // 3. Initialize UI
     initDonutChart(); 
     updateDashboard(); 
     setupSliderListeners();
     
     document.getElementById('scanBtn')?.addEventListener('click', analyzeFood);
-
     document.getElementById('userInput')?.addEventListener('keypress', (e) => {
         if(e.key === 'Enter' && !e.shiftKey) { 
             e.preventDefault(); 
             analyzeFood(); 
         }
     });
-
     document.getElementById('imageInput')?.addEventListener('change', handleImageSelect);
 });
 
@@ -69,8 +64,6 @@ function applyTheme(theme) {
             themeIcon.classList.add('fa-sun');
         }
     }
-
-    // Immediately update charts to reflect new theme colors
     updateDashboard();
 }
 
@@ -89,7 +82,8 @@ function loadSession() {
             const data = JSON.parse(savedData);
             targets = data.targets || targets;
             history = data.history || [];
-            current = data.current || { cals: 0, p: 0, c: 0, f: 0 };
+            // Ensure sugar exists in loaded state
+            current = data.current || { cals: 0, p: 0, c: 0, f: 0, s: 0 };
             renderHistory();
         } catch (e) { console.error("Load error:", e); }
     }
@@ -128,16 +122,26 @@ async function analyzeFood() {
             current.p += item.protein || 0;
             current.c += item.carbs || 0;
             current.f += item.fats || 0;
+            current.s += item.sugar || 0; // Hidden tracking
             
-            const fuzzyRes = calculateFuzzyHealth(item.calories, item.protein, item.fats, item.carbs);
+            const fuzzyRes = calculateFuzzyHealth(item.calories, item.protein, item.fats, item.sugar || 0);
+            drawFuzzyGraph("calGraph", fuzzyRes.mf.cal, getDominant(fuzzyRes.mf.cal));
+            drawFuzzyGraph("proGraph", fuzzyRes.mf.pro, getDominant(fuzzyRes.mf.pro));
+            drawFuzzyGraph("fatGraph", fuzzyRes.mf.fat, getDominant(fuzzyRes.mf.fat));
+            drawFuzzyGraph("sugGraph", fuzzyRes.mf.sug, getDominant(fuzzyRes.mf.sug));
+
+            updateSugenoUI(fuzzyRes.rules, fuzzyRes.score);
             lastScore = fuzzyRes.score;
+            if (!fuzzyRes?.mf) return;
         });
+        
 
         saveSession();
         renderHistory();
         updateDashboard();
         updateChart(); 
         clearImage();
+        selectFoodItem(0);
         document.getElementById('userInput').value = ''; 
 
     } catch (error) {
@@ -145,10 +149,148 @@ async function analyzeFood() {
         alert("Error: " + error.message);
     } finally {
         btn.disabled = false;
-        // Updated to restore the Analyze text with the sparkles icon
         btn.innerHTML = `Analyze <i class="fa-solid fa-sparkles text-sm"></i>`;
         status?.classList.add('hidden');
     }
+}
+
+// --- Sugeno Fuzzy Logic Implementation ---
+function calculateFuzzyHealth(calories = 0, protein = 0, fats = 0, sugar = 0) {
+    // 1. FUZZIFICATION
+    const trapLow = (x, peak, high) => (x <= peak ? 1 : x >= high ? 0 : (high - x) / (high - peak));
+    const tri = (x, low, peak, high) => (x <= low || x >= high) ? 0 : (x < peak ? (x - low) / (peak - low) : (high - x) / (high - peak));
+    const trapHigh = (x, low, peak) => (x >= peak ? 1 : x <= low ? 0 : (x - low) / (peak - low));
+
+    const mf = {
+        cal: { low: trapLow(calories, 100, 300), med: tri(calories, 200, 500, 800), high: trapHigh(calories, 700, 950) },
+        pro: { low: trapLow(protein, 5, 12), med: tri(protein, 10, 25, 40), high: trapHigh(protein, 30, 50) },
+        fat: { low: trapLow(fats, 5, 16), high: trapHigh(fats, 15, 35) },
+        sug: { low: trapLow(sugar, 5, 10), med: tri(sugar, 8, 18, 28), high: trapHigh(sugar, 22, 35) }
+    };
+
+    // 2. RULE EVALUATION (Sugeno Singletons)
+    const Z_VERY_HEALTHY = 95, Z_HEALTHY = 75, Z_NOT_HEALTHY = 40, Z_JUNK = 10;
+    let rules = [];
+
+    // RULES: Junk Food (Z=10)
+    rules.push([mf.sug.high, Z_JUNK]); // Strong penalization for high sugar
+    rules.push([Math.min(mf.cal.high, mf.sug.med), Z_JUNK]);
+    rules.push([Math.min(mf.fat.high, mf.pro.low), Z_JUNK]);
+
+    // RULES: Not Healthy (Z=40)
+    rules.push([Math.min(mf.sug.med, mf.pro.low), Z_NOT_HEALTHY]);
+    rules.push([Math.min(mf.cal.high, mf.pro.med), Z_NOT_HEALTHY]);
+    rules.push([Math.min(mf.fat.high, mf.sug.low), Z_NOT_HEALTHY]);
+
+    // RULES: Healthy (Z=75)
+    rules.push([Math.min(mf.cal.low, mf.sug.low), Z_HEALTHY]);
+    rules.push([Math.min(mf.pro.med, mf.sug.low), Z_HEALTHY]);
+    rules.push([Math.min(mf.cal.med, mf.pro.med), Z_HEALTHY]);
+
+    // RULES: Very Healthy (Z=95)
+    rules.push([Math.min(mf.pro.high, mf.sug.low, mf.fat.low), Z_VERY_HEALTHY]);
+    rules.push([Math.min(mf.cal.low, mf.pro.high), Z_VERY_HEALTHY]);
+
+    // 3. DEFUZZIFICATION (Weighted Average)
+    let sumWeight = 0, sumWeightedValue = 0;
+    rules.forEach(([w, z]) => {
+        sumWeightedValue += (w * z);
+        sumWeight += w;
+    });
+
+    // Default to middle-ground if no rules fire
+    const score = sumWeight === 0 ? 50 : (sumWeightedValue / sumWeight);
+
+    // 4. OUTPUT CATEGORIZATION
+    // 4. OUTPUT CATEGORIZATION
+let category, colorName;
+
+if (score >= 85) {
+    category = "Very Healthy";
+    colorName = "emerald";
+} else if (score >= 60) {
+    category = "Healthy";
+    colorName = "green";
+} else if (score >= 35) {
+    category = "Not Healthy";
+    colorName = "orange";
+} else {
+    category = "Junk Food";
+    colorName = "red";
+}
+
+//  RETURN EVERYTHING THE UI NEEDS
+return {
+    score,
+    category,
+    colorName,
+    mf,        // <-- REQUIRED for graphs
+    rules      // <-- REQUIRED for Sugeno transparency
+};
+}
+
+const fuzzyCharts = {};
+
+function getDominant(mf) {
+    return Object.entries(mf).reduce((a,b)=> a[1] > b[1] ? a : b)[0];
+}
+
+//Fuzzy Graph 
+function drawFuzzyGraph(id, mf, dominant) {
+    if (fuzzyCharts[id]) fuzzyCharts[id].destroy();
+
+    const ctx = document.getElementById(id).getContext("2d");
+
+    fuzzyCharts[id] = new Chart(ctx, {
+        type: "bar",
+        data: {
+            labels: Object.keys(mf),
+            datasets: [{
+                data: Object.values(mf),
+                backgroundColor: Object.keys(mf).map(k =>
+                    k === dominant
+                        ? "rgba(34,197,94,0.45)"
+                        : "rgba(239,68,68,0.15)"
+                )
+            }]
+        },
+        options: {
+            plugins: { legend: { display: false } },
+            scales: { y: { min: 0, max: 1 } }
+        }
+    });
+}
+function updateSugenoUI(rules, score) {
+    let num = 0, den = 0;
+    rules.forEach(([w,z]) => {
+        num += w * z;
+        den += w;
+    });
+
+    document.getElementById("sugenoCalc").innerHTML = `
+        <strong>Sugeno Weighted Average</strong><br>
+        Σ(w × z) = ${num.toFixed(2)}<br>
+        Σ(w) = ${den.toFixed(2)}<br>
+        <strong>Result = ${score.toFixed(1)}</strong>
+    `;
+
+    if (outputChart) outputChart.destroy();
+
+    const ctx = document.getElementById("outputGraph").getContext("2d");
+    outputChart = new Chart(ctx, {
+        type: "bar",
+        data: {
+            labels: ["Junk", "Not Healthy", "Healthy", "Very Healthy"],
+            datasets: [{
+                data: [10, 40, 75, 95],
+                backgroundColor: ["#dc2626","#f59e0b","#22c55e","#15803d"]
+            }]
+        },
+        options: {
+            plugins: { legend: { display: false } },
+            scales: { y: { min: 0, max: 100 } }
+        }
+    });
 }
 
 // --- UI Rendering ---
@@ -159,9 +301,10 @@ function renderHistory() {
     document.getElementById('itemCount').innerText = `${history.length} items`;
 
     history.forEach((item, index) => {
-        const fuzzy = calculateFuzzyHealth(item.calories, item.protein, item.fats, item.carbs);
+        // Pass sugar into the fuzzy calculator (hidden from display)
+        const fuzzy = calculateFuzzyHealth(item.calories, item.protein, item.fats, item.sugar || 0);
         const li = document.createElement('li');
-        li.className = "item-card p-4 rounded-2xl shadow-sm fade-in group relative hover:shadow-md transition-all";
+        li.className = "item-card food-item p-4 rounded-2xl shadow-sm fade-in group relative hover:shadow-md transition-all";
         li.innerHTML = `
             <div class="flex justify-between items-start mb-3">
                 <div>
@@ -180,21 +323,50 @@ function renderHistory() {
                 <span class="badge-f px-2 py-1 rounded-lg font-mono font-medium">${item.fats}g F</span>
             </div>
         `;
+        li.addEventListener("click", () => {
+            selectFoodItem(index);
+        });
         list.appendChild(li);
     });
 }
 
 window.deleteItem = function(index) {
     const item = history[index];
+    lastDeletedItem = { item, index };
+
     current.cals -= item.calories;
     current.p -= item.protein;
     current.c -= item.carbs;
     current.f -= item.fats;
+    current.s -= (item.sugar || 0);
+
     history.splice(index, 1);
     saveSession();
     renderHistory();
     updateDashboard();
+
+    const undoBtn = document.getElementById("undoBtn");
+    undoBtn.classList.remove("hidden");
+
+    clearTimeout(undoTimer);
+    undoTimer = setTimeout(() => {
+        lastDeletedItem = null;
+        undoBtn.classList.add("hidden");
+    }, 5000);
 };
+
+document.getElementById("undoBtn").onclick = () => {
+    if (!lastDeletedItem) return;
+
+    history.splice(lastDeletedItem.index, 0, lastDeletedItem.item);
+    lastDeletedItem = null;
+
+    saveSession();
+    renderHistory();
+    updateDashboard();
+    document.getElementById("undoBtn").classList.add("hidden");
+};
+
 
 function initDonutChart() {
     const canvas = document.getElementById('calorieDonut');
@@ -238,8 +410,8 @@ function updateDashboard() {
     document.getElementById('calFraction').innerText = `${consumed}/${targets.cals}`;
 
     if (donutChartInstance) {
+        // Sugar is intentionally excluded from the chart data
         donutChartInstance.data.datasets[0].data = [pCals, cCals, fCals, remaining];
-        // Theme-aware placeholder color for donut
         donutChartInstance.data.datasets[0].backgroundColor[3] = (currentTheme === 'dark') ? 'rgba(255, 255, 255, 0.2)' : '#94a3b8';
         donutChartInstance.update();
     }
@@ -384,28 +556,6 @@ window.saveIntake = function() {
     updateDashboard();
 };
 
-function calculateFuzzyHealth(calories=0, protein=0, fats=0, carbs=0) {
-    const tri = (val, low, peak, high) => (val <= low || val >= high) ? 0 : (val < peak ? (val - low) / (peak - low) : (high - val) / (high - peak));
-    const trapLow = (val, peak, high) => (val <= peak ? 1 : val >= high ? 0 : (high - val) / (high - peak));
-    const trapHigh = (val, low, peak) => (val >= peak ? 1 : val <= low ? 0 : (val - low) / (peak - low));
-    const f = {
-        calories: { low: trapLow(calories, 150, 400), med: tri(calories, 300, 500, 700), high: trapHigh(calories, 600, 800) },
-        protein: { low: trapLow(protein, 5, 10), med: tri(protein, 5, 15, 25), high: trapHigh(protein, 20, 30) },
-        fats: { low: trapLow(fats, 5, 10), med: tri(fats, 5, 15, 25), high: trapHigh(fats, 20, 30) },
-        carbs: { low: trapLow(carbs, 20, 40), med: tri(carbs, 30, 60, 90), high: trapHigh(carbs, 80, 100) }
-    };
-    let rs = { vh: 0, h: 0, nh: 0, j: 0 };
-    rs.vh = Math.max(rs.vh, Math.min(f.protein.high, f.fats.low));
-    rs.h = Math.max(rs.h, Math.min(f.protein.med, f.carbs.med, f.fats.med));
-    rs.j = Math.max(rs.j, Math.min(f.fats.high, f.carbs.high));
-    rs.nh = Math.max(rs.nh, 0.1); 
-    const score = ((rs.vh * 90) + (rs.h * 65) + (rs.nh * 35) + (rs.j * 15)) / (rs.vh + rs.h + rs.nh + rs.j || 1);
-    if (score >= 80) return { score, category: "Very Healthy", colorName: "emerald" };
-    if (score >= 60) return { score, category: "Healthy", colorName: "green" };
-    if (score >= 35) return { score, category: "Not Healthy", colorName: "orange" };
-    return { score, category: "Junk Food", colorName: "red" };
-}
-
 function handleImageSelect(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -436,6 +586,52 @@ window.toggleGraphModal = function() {
         modal.classList.add('hidden');
     }
 };
+
+let selectedFoodIndex = null;
+
+function selectFoodItem(index) {
+    selectedFoodIndex = index;
+
+    // 1. Highlight selected item
+    document.querySelectorAll(".food-item").forEach((el, i) => {
+        el.classList.toggle("active", i === index);
+    });
+
+    // 2. Get food data
+    const item = history[index];
+    if (!item) return;
+
+    // 3. Recalculate fuzzy logic
+    const fuzzyRes = calculateFuzzyHealth(
+        item.calories,
+        item.protein,
+        item.fats,
+        item.sugar || 0
+    );
+
+    // 4. Update graphs
+    drawFuzzyGraph("calGraph", fuzzyRes.mf.cal, getDominant(fuzzyRes.mf.cal));
+    drawFuzzyGraph("proGraph", fuzzyRes.mf.pro, getDominant(fuzzyRes.mf.pro));
+    drawFuzzyGraph("fatGraph", fuzzyRes.mf.fat, getDominant(fuzzyRes.mf.fat));
+    drawFuzzyGraph("sugGraph", fuzzyRes.mf.sug, getDominant(fuzzyRes.mf.sug));
+
+    updateSugenoUI(fuzzyRes.rules, fuzzyRes.score);
+
+    // 5. Animate graphs
+    animateGraphs();
+}
+
+function animateGraphs() {
+    ["calGraph", "proGraph", "fatGraph", "sugGraph", "outputGraph"].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+
+        el.classList.remove("graph-animate");
+        void el.offsetWidth; // force reflow
+        el.classList.add("graph-animate");
+    });
+}
+
 
 function initChart() {
     const ctx = document.getElementById('fuzzyChart').getContext('2d');
