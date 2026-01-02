@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project is a **Nutrition Analyzer Web Application** that allows users to analyze food items using **text input and/or images**. It leverages **Google Gemini (gemini-2.5-flash)** via a FastAPI backend to estimate calories and macronutrients, returning structured nutritional data in JSON format.
+**NutriScan AI : Personalized Calorie Tracker** is a webb application that allows users to analyze food items using **text input and/or images**. It leverages **Google Gemini (gemini-2.5-flash)** via a FastAPI backend to estimate calories and macronutrients, returning structured nutritional data in JSON format.
 
 The system is designed with a clear separation between:
 

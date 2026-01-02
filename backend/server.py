@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import uvicorn
 import base64
 from google import genai
@@ -10,14 +11,8 @@ from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
 
-# ==========================================
 # CONFIGURATION
-# ==========================================
-
-#Load environment variables from .env file
 load_dotenv()
-
-#Get key from env
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 # API safety check
@@ -26,21 +21,21 @@ if not GOOGLE_API_KEY:
     print("   Please create a .env file with GOOGLE_API_KEY=AIza...")
     sys.exit(1)
 
-# Clean key just in case
-GOOGLE_API_KEY = GOOGLE_API_KEY.strip()
 
-# Initialize the Client
+GOOGLE_API_KEY = GOOGLE_API_KEY.strip() # Clean key just in case
+
+# Initialize google client
 try:
     client = genai.Client(api_key=GOOGLE_API_KEY)
 except Exception as e:
     print(f"❌ Error initializing Google Client: {e}")
     sys.exit(1)
 
-# Use Gemini 2.5 flash; best free tier with more RPM
-MODEL_NAME = "gemini-2.5-flash"
+
+MODEL_NAME = "gemini-2.5-flash" # Use Gemini 2.5 flash
 PORT = 8000
 
-# Initialize FastAPI App
+# Initialize FastAPI App and middleware
 app = FastAPI()
 
 app.add_middleware(
@@ -51,9 +46,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ==========================================
 # SYSTEM PROMPT
-# ==========================================
 SYSTEM_PROMPT = """
 You are a specialized Nutrition Analyzer API.
 Your job is to analyze food descriptions (and images if provided) and return a JSON ARRAY of nutrition objects.
@@ -76,14 +69,13 @@ JSON Structure per item:
 }
 """
 
-#request base model (with image)
+#request basemodel
 class FoodRequest(BaseModel):
     text: str = ""
     image: Optional[str] = None # Base64 string
 
-# ==========================================
+
 # DEBUG TOOL
-# ==========================================
 def print_available_models():
     """Prints list of models available to this API key on startup"""
     try:
@@ -114,7 +106,7 @@ def analyze_food(request: FoodRequest):
         print("Received Image Data")
 
     try:
-        # Prepare content list for Gemini
+        # Prepare content list
         contents = []
         
         # Add System Prompt & Text
