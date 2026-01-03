@@ -293,6 +293,7 @@ function calculateFuzzyHealth(calories = 0, protein = 0, fats = 0, sugar = 0) {
     rules.push({ weight: Math.min(mf.sug.med, mf.cal.med, mf.fat.med), consequent: Z_NOT_HEALTHY, desc: "Moderate sugar, cal, and fat" });
     rules.push({ weight: Math.min(mf.pro.high, mf.sug.high), consequent: Z_NOT_HEALTHY, desc: "High Sugar + High Protein" });
     rules.push({ weight: Math.min(mf.sug.high, mf.pro.low), consequent: Z_NOT_HEALTHY, desc: "High sugar + Low protein" });
+    
     // Healthy Rules (z=75)
     rules.push({ weight: Math.min(mf.cal.low, mf.sug.low), consequent: Z_HEALTHY, desc: "Low cal + Low sugar" });
     rules.push({ weight: Math.min(mf.pro.med, mf.sug.low), consequent: Z_HEALTHY, desc: "Med protein + Low sugar" });
