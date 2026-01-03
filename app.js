@@ -246,78 +246,71 @@ function calculateFuzzyHealth(calories = 0, protein = 0, fats = 0, sugar = 0) {
     const tri = (x, low, peak, high) => (x <= low || x >= high) ? 0 : (x < peak ? (x - low) / (peak - low) : (high - x) / (high - peak));
     const trapHigh = (x, low, peak) => (x >= peak ? 1 : x <= low ? 0 : (x - low) / (peak - low));
 
+    // ADJUSTED MEMBERSHIP FUNCTION THRESHOLDS
     const mf = {
-        cal: { 
-            low: trapLow(calories, 0, 250),        // Fully low: 0-250 kcal
-            med: tri(calories, 200, 450, 700),     // Peak at 450 kcal
-            high: trapHigh(calories, 650, 900)     // Fully high: 900+ kcal
-        },
-        pro: { 
-            low: trapLow(protein, 0, 10),          // Fully low: 0-10g
-            med: tri(protein, 8, 20, 35),          // Peak at 20g
-            high: trapHigh(protein, 25, 40)        // Start high at 25g, fully high at 40g
-        },
-        fat: { 
-            low: trapLow(fats, 0, 8),              // Fully low: 0-8g
-            med: tri(fats, 6, 15, 28),             // Peak at 15g
-            high: trapHigh(fats, 22, 35)           // Start high at 22g, fully high at 35g
-        },
-        sug: { 
-            low: trapLow(sugar, 0, 8),             // Fully low: 0-8g
-            med: tri(sugar, 6, 15, 25),            // Peak at 15g
-            high: trapHigh(sugar, 20, 30)          // Start high at 20g, fully high at 30g
-        }
+    cal: {
+        low: trapLow(calories, 0, 200),
+        med: tri(calories, 150, 400, 600),
+        high: trapHigh(calories, 500, 700) },
+    pro: {
+        low: trapLow(protein, 0, 12),
+        med: tri(protein, 10, 22, 35),
+        high: trapHigh(protein, 28, 45) },
+    fat: {
+        low: trapLow(fats, 0, 10),
+        med: tri(fats, 8, 18, 30),
+        high: trapHigh(fats, 25, 40) },
+    sug: {
+        low: trapLow(sugar, 0, 10),
+        med: tri(sugar, 8, 18, 30),
+        high: trapHigh(sugar, 25, 40) }
     };
 
     // Sugeno Consequent Values
     const Z_VERY_HEALTHY = 95, Z_HEALTHY = 75, Z_MODERATE = 55, Z_NOT_HEALTHY = 35, Z_JUNK = 10;
     let rules = [];
-    rules.push({ weight: mf.sug.high, consequent: Z_JUNK, desc: "Excessive sugar content" });
-    rules.push({ weight: Math.min(mf.cal.high, mf.sug.med, mf.pro.low), consequent: Z_JUNK, desc: "High cal + Med sugar + Low protein (empty calories)" });
-    rules.push({ weight: Math.min(mf.fat.high, mf.pro.low, mf.cal.high), consequent: Z_JUNK, desc: "High fat + Low protein + High cal (fried junk)" });
-    rules.push({ weight: Math.min(mf.sug.high, mf.fat.high), consequent: Z_JUNK, desc: "High sugar + High fat (desserts, pastries)" });
-    rules.push({ weight: Math.min(mf.cal.high, mf.fat.high, mf.sug.med), consequent: Z_JUNK, desc: "Calorie bomb with fat and sugar" });
+
+    // ===== JUNK FOOD RULES (z=10) =====
+    // Critical red flags that make food junk regardless of other factors
+    rules.push({ weight: mf.sug.high, consequent: Z_JUNK, desc: "Excessive sugar" });
+    rules.push({ weight: Math.min(mf.fat.high, mf.pro.low), consequent: Z_JUNK, desc: "High fat + Low protein" });
+    rules.push({ weight: Math.min(mf.cal.high, mf.fat.high), consequent: Z_JUNK, desc: "Excessive calories and fat" });
+    rules.push({ weight: Math.min(mf.cal.high, mf.sug.med, mf.pro.low), consequent: Z_JUNK, desc: "High cal + Med sugar + Low protein" });
+    rules.push({ weight: Math.min(mf.sug.med, mf.fat.high), consequent: Z_JUNK, desc: "Med sugar + High fat" });
 
     // ===== NOT HEALTHY RULES (z=35) =====
-    // Imbalanced or excessive in some nutrients
-    rules.push({ weight: Math.min(mf.sug.med, mf.pro.low), consequent: Z_NOT_HEALTHY, desc: "Med sugar + Low protein (sugary snacks)" });
-    rules.push({ weight: Math.min(mf.cal.high, mf.pro.low), consequent: Z_NOT_HEALTHY, desc: "High cal + Low protein (nutrient poor)" });
-    rules.push({ weight: Math.min(mf.fat.high, mf.sug.med, mf.pro.low), consequent: Z_NOT_HEALTHY, desc: "High fat + Med sugar + Low protein" });
-    rules.push({ weight: Math.min(mf.cal.high, mf.fat.med, mf.pro.low), consequent: Z_NOT_HEALTHY, desc: "High cal with poor protein content" });
-    rules.push({ weight: Math.min(mf.sug.med, mf.fat.med, mf.pro.low), consequent: Z_NOT_HEALTHY, desc: "Moderate junk with low protein" });
+    // Significant nutritional imbalances
+    rules.push({ weight: Math.min(mf.cal.high, mf.pro.low), consequent: Z_NOT_HEALTHY, desc: "High cal + Low protein" });
+    rules.push({ weight: Math.min(mf.sug.med, mf.pro.low), consequent: Z_NOT_HEALTHY, desc: "Med sugar + Low protein" });
+    rules.push({ weight: Math.min(mf.fat.high, mf.pro.low), consequent: Z_NOT_HEALTHY, desc: "High fat + Low protein" });
+    rules.push({ weight: Math.min(mf.cal.med, mf.fat.high, mf.pro.low), consequent: Z_NOT_HEALTHY, desc: "Med cal + High fat + Low protein" });
+    rules.push({ weight: Math.min(mf.sug.med, mf.fat.med, mf.pro.low), consequent: Z_NOT_HEALTHY, desc: "Med sugar/fat + Low protein" });
+    rules.push({ weight: Math.min(mf.cal.low, mf.pro.low, mf.fat.low, mf.sug.low), consequent: Z_NOT_HEALTHY, desc: "Insufficient nutrients" });
 
     // ===== MODERATE RULES (z=55) =====
-    // Balanced but not optimal
-    rules.push({ weight: Math.min(mf.cal.med, mf.pro.med, mf.sug.med), consequent: Z_MODERATE, desc: "All moderate - balanced but not optimal" });
-    rules.push({ weight: Math.min(mf.cal.med, mf.fat.med, mf.pro.med), consequent: Z_MODERATE, desc: "Moderate across all macros" });
-    rules.push({ weight: Math.min(mf.pro.med, mf.sug.med), consequent: Z_MODERATE, desc: "Med protein + Med sugar (needs improvement)" });
-    rules.push({ weight: Math.min(mf.cal.high, mf.pro.high, mf.sug.med), consequent: Z_MODERATE, desc: "High cal/protein but concerning sugar" });
+    // Balanced but not optimal, or high calories with redeeming qualities
+    rules.push({ weight: Math.min(mf.cal.med, mf.pro.med, mf.sug.med), consequent: Z_MODERATE, desc: "All moderate" });
+    rules.push({ weight: Math.min(mf.cal.med, mf.fat.med, mf.pro.med), consequent: Z_MODERATE, desc: "Balanced moderate macros" });
+    rules.push({ weight: Math.min(mf.fat.med, mf.pro.med, mf.sug.low), consequent: Z_MODERATE, desc: "Med fat/protein + Low sugar" });
+    rules.push({ weight: Math.min(mf.cal.high, mf.pro.high, mf.sug.low), consequent: Z_MODERATE, desc: "High cal/protein + Low sugar" });
+    rules.push({ weight: Math.min(mf.fat.high, mf.pro.med, mf.sug.low), consequent: Z_MODERATE, desc: "High fat + Med protein + Low sugar" });
 
     // ===== HEALTHY RULES (z=75) =====
-    // Good nutritional profile
-    rules.push({ weight: Math.min(mf.cal.low, mf.sug.low), consequent: Z_HEALTHY, desc: "Low cal + Low sugar (diet-friendly)" });
-    rules.push({ weight: Math.min(mf.pro.med, mf.sug.low, mf.fat.low), consequent: Z_HEALTHY, desc: "Med protein + Low sugar + Low fat (lean meals)" });
-    rules.push({ weight: Math.min(mf.cal.med, mf.pro.med, mf.sug.low), consequent: Z_HEALTHY, desc: "Balanced: Med cal/protein + Low sugar" });
-    rules.push({ weight: Math.min(mf.pro.high, mf.sug.low, mf.fat.med), consequent: Z_HEALTHY, desc: "High protein + Low sugar + Med fat (protein meals)" });
-    rules.push({ weight: Math.min(mf.pro.high, mf.sug.low, mf.cal.med), consequent: Z_HEALTHY, desc: "High protein + Low sugar + Med cal (optimal)" });
-    rules.push({ weight: Math.min(mf.fat.high, mf.pro.high, mf.sug.low, mf.cal.med), consequent: Z_HEALTHY, desc: "Keto-style: High fat/protein + Low sugar" });
-    rules.push({ weight: Math.min(mf.pro.med, mf.fat.low, mf.sug.low), consequent: Z_HEALTHY, desc: "Clean eating: Med protein + Low fat/sugar" });
-    rules.push({ weight: Math.min(mf.cal.low, mf.pro.med, mf.sug.low), consequent: Z_HEALTHY, desc: "Low cal + Med protein + Low sugar (weight loss)" });
+    // Good nutritional profile with low sugar
+    rules.push({ weight: Math.min(mf.cal.low, mf.sug.low), consequent: Z_HEALTHY, desc: "Low cal + Low sugar" });
+    rules.push({ weight: Math.min(mf.pro.med, mf.sug.low, mf.fat.low), consequent: Z_HEALTHY, desc: "Med protein + Low sugar/fat" });
+    rules.push({ weight: Math.min(mf.cal.med, mf.pro.med, mf.sug.low), consequent: Z_HEALTHY, desc: "Med cal/protein + Low sugar" });
+    rules.push({ weight: Math.min(mf.pro.high, mf.sug.low, mf.cal.low), consequent: Z_HEALTHY, desc: "High protein + Low sugar/cal" });
+    rules.push({ weight: Math.min(mf.pro.high, mf.sug.low, mf.cal.med), consequent: Z_HEALTHY, desc: "High protein + Low sugar + Med cal" });
+    rules.push({ weight: Math.min(mf.fat.high, mf.pro.high, mf.sug.low), consequent: Z_HEALTHY, desc: "High fat/protein + Low sugar" });
+    rules.push({ weight: Math.min(mf.fat.med, mf.pro.high, mf.sug.low), consequent: Z_HEALTHY, desc: "Med fat + High protein + Low sugar" });
 
     // ===== VERY HEALTHY RULES (z=95) =====
-    // Optimal nutritional profile
-    rules.push({ weight: Math.min(mf.pro.high, mf.sug.low, mf.fat.low), consequent: Z_VERY_HEALTHY, desc: "High protein + Low sugar + Low fat (ideal lean)" });
-    rules.push({ weight: Math.min(mf.cal.low, mf.pro.high, mf.sug.low), consequent: Z_VERY_HEALTHY, desc: "Low cal + High protein + Low sugar (optimal)" });
-    rules.push({ weight: Math.min(mf.cal.low, mf.pro.med, mf.sug.low, mf.fat.low), consequent: Z_VERY_HEALTHY, desc: "Low cal + Med protein + Low sugar/fat (clean)" });
-    rules.push({ weight: Math.min(mf.pro.high, mf.cal.med, mf.sug.low, mf.fat.low), consequent: Z_VERY_HEALTHY, desc: "High protein + Med cal + Low sugar/fat (bodybuilding)" });
-
-    // ===== EDGE CASE RULES (Additional coverage) =====
-    // Handle nutritional edge cases
-    rules.push({ weight: Math.min(mf.cal.low, mf.pro.low, mf.fat.low), consequent: Z_NOT_HEALTHY, desc: "Too low in everything (malnutrition risk)" });
-    rules.push({ weight: Math.min(mf.fat.high, mf.pro.high, mf.cal.high, mf.sug.low), consequent: Z_MODERATE, desc: "Calorie-dense but clean macros (bulking food)" });
-    rules.push({ weight: Math.min(mf.sug.low, mf.fat.low, mf.pro.low, mf.cal.low), consequent: Z_MODERATE, desc: "Very light food (veggies, but lacks protein)" });
-    rules.push({ weight: Math.min(mf.pro.high, mf.cal.high, mf.sug.low, mf.fat.low), consequent: Z_HEALTHY, desc: "Protein shake/supplement (high protein efficiency)" });
-    rules.push({ weight: Math.min(mf.fat.high, mf.cal.med, mf.sug.low, mf.pro.low), consequent: Z_NOT_HEALTHY, desc: "High fat without protein benefit (chips, fries)" });
+    // Optimal lean protein sources
+    rules.push({ weight: Math.min(mf.pro.high, mf.sug.low, mf.fat.low), consequent: Z_VERY_HEALTHY, desc: "High protein + Low sugar/fat" });
+    rules.push({ weight: Math.min(mf.cal.low, mf.pro.high, mf.sug.low), consequent: Z_VERY_HEALTHY, desc: "Low cal + High protein + Low sugar" });
+    rules.push({ weight: Math.min(mf.pro.high, mf.cal.med, mf.sug.low, mf.fat.low), consequent: Z_VERY_HEALTHY, desc: "High protein + Med cal + Low sugar/fat" });
+    rules.push({ weight: Math.min(mf.cal.low, mf.pro.med, mf.sug.low, mf.fat.low), consequent: Z_VERY_HEALTHY, desc: "Low cal + Med protein + Low sugar/fat" });
 
     // Sugeno Defuzzification: Weighted Average
     // score = Σ(wi × zi) / Σ(wi)
@@ -332,13 +325,21 @@ function calculateFuzzyHealth(calories = 0, protein = 0, fats = 0, sugar = 0) {
 
     let category, colorName;
 
+    // Calculate midpoints to find the "closest" singleton
+    // Midpoint between 95 and 75 = 85
+    // Midpoint between 75 and 55 = 65
+    // Midpoint between 55 and 35 = 45
+    // Midpoint between 35 and 10 = 22.5
     if (finalScore >= 85) {
         category = "Very Healthy";
         colorName = "emerald";
-    } else if (finalScore >= 60) {
+    } else if (finalScore >= 65) {
         category = "Healthy";
         colorName = "green";
-    } else if (finalScore >= 35) {
+    } else if (finalScore >= 45) {
+        category = "Moderate";
+        colorName = "yellow";
+    } else if (finalScore >= 25) {
         category = "Not Healthy";
         colorName = "orange";
     } else {
@@ -649,18 +650,19 @@ function updateSugenoUI(rules, score) {
     const ctx = document.getElementById("outputGraph")?.getContext("2d");
     if (!ctx) return;
     
-    // ✅ Singleton output graph with vertical lines
     const singletonValues = [
         { x: 10, label: 'Junk', color: '#dc2626' },
-        { x: 40, label: 'Not Healthy', color: '#f59e0b' },
+        { x: 35, label: 'Not Healthy', color: '#f97316' },
+        { x: 55, label: 'Moderate', color: '#eab308' },
         { x: 75, label: 'Healthy', color: '#22c55e' },
         { x: 95, label: 'Very Healthy', color: '#15803d' }
     ];
 
     let scoreColor = '#6d7785ff';
-    if (score >= 95) scoreColor = '#15803d';
-    else if (score >= 75) scoreColor = '#22c55e';
-    else if (score >= 40) scoreColor = '#f59e0b';
+    if (score >= 85) scoreColor = '#15803d';      
+    else if (score >= 65) scoreColor = '#22c55e'; 
+    else if (score >= 45) scoreColor = '#eab308'; 
+    else if (score >= 25) scoreColor = '#f97316'; 
     else scoreColor = '#dc2626';
 
     outputChart = new Chart(ctx, {
@@ -695,7 +697,7 @@ function updateSugenoUI(rules, score) {
                     
                     // Label at bottom
                     ctx.fillStyle = singleton.color;
-                    ctx.font = 'bold 9px Inter';
+                    ctx.font = 'bold 11px Inter';
                     ctx.textAlign = 'center';
                     ctx.fillText(singleton.label, x, yAxis.bottom + 35);
                 });
