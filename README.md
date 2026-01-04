@@ -1,8 +1,10 @@
-# Nutrition Analyzer Web Application
+# NutriScan AI: Personalized Calorie Tracker
+
+---
 
 ## Overview
 
-**NutriScan AI : Personalized Calorie Tracker** is a webb application that allows users to analyze food items using **text input and/or images**. It leverages **Google Gemini (gemini-2.5-flash)** via a FastAPI backend to estimate calories and macronutrients, returning structured nutritional data in JSON format.
+**NutriScan AI** is a web application that allows users to analyze food items using **text input and/or images**. It leverages **Google Gemini (gemini-2.5-flash)** via a FastAPI backend to estimate calories and macronutrients, returning structured nutritional data in JSON format.
 
 The system is designed with a clear separation between:
 
@@ -22,7 +24,7 @@ This README is divided into **User Guide** and **Calculation / Technical Explana
 
 ### Technology Stack
 
-* **Frontend**: HTML, JavaScript (Vanilla)
+* **Frontend**: HTML, JavaScript, Tailwind CSS
 * **Backend**: Python, FastAPI, Uvicorn
 * **AI Model**: Google Gemini 2.5 Flash
 * **Data Format**: JSON
@@ -52,7 +54,7 @@ Install Requirements:
 pip install -r requirements.txt
 ```
 
-Ensure you have Python installed and create a `.env` file in the same directory:
+Ensure you have Python installed and create a `.env` file in the backend directory with the following content:
 
 
 ```
