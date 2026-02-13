@@ -48,17 +48,30 @@ Each food item is analyzed individually and returned with calories, macros, and 
 ## How to Use the Application
 
 ### 1. Launch the Backend Server
+Redirect yourself into backend folder, or copy this into your terminal:
+
+```
+cd backend
+```
 
 Install Requirements:
+
 ```
 pip install -r requirements.txt
 ```
 
+To use the Gemini models within this application, you will need a Google AI Studio API key. How to generate a key:
+1) Visit the Google AI Studio website.
+2) Sign in with your Google account.
+3) On the left-hand sidebar, click on "Get API key".
+4) Click the button labeled "Create API key in new project".
+5) Copy the generated key (it usually starts with AIza...).
+
+
 Ensure you have Python installed and create a `.env` file in the backend directory with the following content:
 
-
 ```
-GOOGLE_API_KEY=your_api_key_here
+GOOGLE_API_KEY=paste_your_api_key_here
 ```
 
 Run the server:
@@ -66,8 +79,13 @@ Run the server:
 ```
 python server.py
 ```
+or
 
-The API will run at:
+```
+uvicorn server:app --reload
+```
+
+The backend server will run at:
 
 ```
 http://localhost:8000
@@ -79,7 +97,7 @@ http://localhost:8000
 
 Open `index.html` in a browser.
 
-The UI provides:
+The UI Input provides:
 
 * A **text input** for food descriptions
 * An **image upload** option
